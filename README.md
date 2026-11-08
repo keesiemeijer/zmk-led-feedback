@@ -30,9 +30,18 @@ The layer indication has priority over connection warnings. The warning resumes 
 ## Compatibility
 
 Built for ZMK v0.3 and nRF52840 (nice!nano v2).</br>
-See [Pro Micro Compatible](https://github.com/joric/nrfmicro/wiki/Alternatives#pro-micro-compatible) wireless boards.
 
-Tested with a [supermini-nrf52840](https://github.com/joric/nrfmicro/wiki/Alternatives#supermini-nrf52840)
+### Keyboards
+
+The dongle is designed to work with ZMK v0.3 (split) keyboards built with BLE-capable controller boards listed in [ZMK’s supported hardware](https://v0-3-branch.zmk.dev/docs/hardware). But you'll have to configure the keyboard controllers as peripherals to pair them with the dongle.
+
+### Dongle
+
+Use a BLE-capable controller board listed in [ZMK’s v0.3 supported hardware](https://v0-3-branch.zmk.dev/docs/hardware) and configure it as the central. The board must also support a LED-strip driver compatible with your strip. See the [dongle setup guide](docs/dongle-setup.md).
+
+### Tested controller boards
+
+- [supermini-nrf52840](https://github.com/joric/nrfmicro/wiki/Alternatives#supermini-nrf52840) (nicenano-v2 clone) controller board for the dongle.
 
 ## Installation
 
