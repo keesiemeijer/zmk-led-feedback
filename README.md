@@ -27,16 +27,10 @@ This module can also be used on regular (split) keyboards, but it only reports o
 
 The layer indication has priority over connection warnings. The warning resumes afterwards. A battery display (shown on request) temporarily takes priority over both. Layer changes stops the battery display.
 
-## Status
+## Build
 
-Hardware testing has started; validation is ongoing. Built for ZMK v0.3 and the nRF52840 (nice!nano v2).
-
-## Tests
-
-The GitHub Actions **Firmware build matrix** builds a test dongle with LED feedback enabled, LED
-feedback off without overrides, and LED feedback off with all overrides and battery warnings
-enabled. It checks that these configurations build with ZMK v0.3; it does not test LED behavior on
-hardware.
+Built for ZMK v0.3 and the nRF52840 (nice!nano v2).
+Tested with a [supermini-nrf52840](https://github.com/joric/nrfmicro/wiki/Alternatives#supermini-nrf52840)
 
 ## Installation
 
