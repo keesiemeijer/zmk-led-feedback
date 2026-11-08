@@ -1,0 +1,6 @@
+name: zmk-led-feedback
+build:
+    cmake: .
+    kconfig: Kconfig
+    settings:
+      dts_root: .

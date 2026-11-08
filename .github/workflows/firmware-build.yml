@@ -1,0 +1,52 @@
+name: Firmware build matrix
+
+on:
+    push:
+        paths-ignore:
+            - "**.md"
+    pull_request:
+        paths-ignore:
+            - "**.md"
+    workflow_dispatch:
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        container:
+            image: zmkfirmware/zmk-build-arm:stable
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - name: feedback-on
+                      cmake-args: -DCONFIG_ZMK_DISPLAY=n
+                    - name: feedback-off-no-overrides
+                      cmake-args: -DCONFIG_ZMK_DISPLAY=n -DCONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y
+                    - name: feedback-off-all-overrides
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_OFF_OVERRIDES=\"layer_feedback,layer_change,battery_feedback,battery_warning,connection_warning\"
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
+        name: Build (${{ matrix.name }})
+        steps:
+            - uses: actions/checkout@v4
+            - name: Prepare west workspace
+              run: |
+                  mkdir -p "$RUNNER_TEMP/zmk-workspace/config"
+                  cp -R "$GITHUB_WORKSPACE/tests/firmware-build/config/." "$RUNNER_TEMP/zmk-workspace/config/"
+            - name: Initialize west workspace
+              working-directory: ${{ runner.temp }}/zmk-workspace
+              run: |
+                  west init -l config
+                  west update --fetch-opt=--filter=tree:0
+                  west zephyr-export
+            - name: Build test dongle
+              working-directory: ${{ runner.temp }}/zmk-workspace
+              run: |
+                  west build -s zmk/app -d build -b nice_nano_v2 -- \
+                    -DZMK_CONFIG="$RUNNER_TEMP/zmk-workspace/config" \
+                    -DZMK_EXTRA_MODULES="$GITHUB_WORKSPACE" \
+                    -DSHIELD=lf_test_dongle \
+                    ${{ matrix.cmake-args }}

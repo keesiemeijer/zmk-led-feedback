@@ -1,0 +1,8 @@
+# Copyright (c) 2026 keesiemeijer
+# SPDX-License-Identifier: MIT
+
+description: LED feedback behavior
+
+compatible: "zmk,behavior-led-feedback"
+
+include: one_param.yaml
