@@ -27,9 +27,11 @@ This module can also be used on regular (split) keyboards, but it only reports o
 
 The layer indication has priority over connection warnings. The warning resumes afterwards. A battery display (shown on request) temporarily takes priority over both. Layer changes stops the battery display.
 
-## Build
+## Compatibility
 
-Built for ZMK v0.3 and the nRF52840 (nice!nano v2).
+Built for ZMK v0.3 and nRF52840 (nice!nano v2).</br>
+See [Pro Micro Compatible](https://github.com/joric/nrfmicro/wiki/Alternatives#pro-micro-compatible) wireless boards.
+
 Tested with a [supermini-nrf52840](https://github.com/joric/nrfmicro/wiki/Alternatives#supermini-nrf52840)
 
 ## Installation
