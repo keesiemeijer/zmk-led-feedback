@@ -1,6 +1,6 @@
 # zmk-led-feedback
 
-A [ZMK](https://zmk.dev) module that shows the state of your keyboard on a small WS2812-style LED strip. It runs on the central, which makes it a good fit for a [dongle](https://zmk.dev/docs/hardware-integration/dongle). Use a single LED or as many as you need.
+A [ZMK](https://zmk.dev) module that shows the state of your keyboard on a small WS2812-style LED strip. It runs on the central, which makes it a good fit for a [dongle](https://zmk.dev/docs/hardware-integration/dongle). Use it with a single LED or as many as you want.
 
 When you add a dongle to your (split) keyboard setup it takes on the role of "**central**". All other parts of the keyboard are called "**peripherals**". For more information see ZMK's [central and peripheral roles](https://zmk.dev/docs/features/split-keyboards#central-and-peripheral-roles). In the rest of the documentation you can assume "the central" means "the dongle"
 
@@ -96,14 +96,11 @@ These options are shared between this module's feedback features. Use them in yo
 | `CONFIG_ZMK_LED_FEEDBACK_BRIGHTNESS_STEP`                                            | `16`    | Brightness change for each key press.                                                                                                                                                   |
 | `CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS`                                          | `500`   | Duration of connection and battery warning blinks.                                                                                                                                      |
 
-Example options:
+##### Example
 
 ```ini
 # Enable the module
 CONFIG_ZMK_LED_FEEDBACK=y
-
-# Allow warnings when the led display is off (with the DISPLAY_OFF option or LF_OFF keycode)
-CONFIG_ZMK_LED_FEEDBACK_OFF_OVERRIDES="battery_warning,connection_warning"
 ```
 
 ### Layer feedback

@@ -82,6 +82,8 @@ CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
 
 The warning blinks red then yellow. At most four LEDs blink, regardless of strip length. The warnings don’t display the device number (as connection warnings do). Press the [battery display keys](#keycodes) for each device to find which one needs charging.
 
+If a layer change interrupts a warning, the warning is dismissed. One red/yellow blink is shown after the layer indication clears if the battery is still low.
+
 The shared CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS option controls the duration of each red or yellow warning color. Set an interval duration in the zmk-config [`.conf`](dongle-setup.md#dongle-configuration-file) file for the dongle.
 
 Example setting the blink duration to 800 milliseconds.
@@ -110,4 +112,3 @@ Example setting the battery warnings to 10 blinks long:
 ```ini
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS=10
 ```
-
