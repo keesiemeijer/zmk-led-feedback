@@ -31,7 +31,7 @@ jobs:
                           -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
         name: Build (${{ matrix.name }})
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7.0.1
             - name: Prepare west workspace
               run: |
                   mkdir -p "$RUNNER_TEMP/zmk-workspace/config"

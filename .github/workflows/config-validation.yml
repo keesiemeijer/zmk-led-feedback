@@ -13,7 +13,7 @@ jobs:
   config-validation:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - name: Configure tests
         run: cmake -S tests/config-validation -B build/config-validation
       - name: Run tests
