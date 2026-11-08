@@ -22,6 +22,7 @@
 
 #include <zmk_led_feedback.h>
 
+// Checks the battery level (if enabled) and triggers a warning if it falls below the configured threshold.
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY) && CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
 static void battery_warn_check(void);
 #endif

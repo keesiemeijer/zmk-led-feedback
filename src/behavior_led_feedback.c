@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+// LED feedback behavior driver for ZMK.
 #define DT_DRV_COMPAT zmk_behavior_led_feedback
 
 #include <drivers/behavior.h>
