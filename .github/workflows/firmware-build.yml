@@ -20,6 +20,28 @@ jobs:
                 include:
                     - name: feedback-on
                       cmake-args: -DCONFIG_ZMK_DISPLAY=n
+                      required_config: CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+                    - name: connection-zero-required
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=0
+                      required_config: CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=0
+                    - name: connection-reordered-required
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
+                          -DCONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER=\"2,1\"
+                      required_config: CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
+                      slot_config: 'CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="2,1"'
+                    - name: battery-only-required
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_CONNECTION=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
+                      required_config: CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
                     - name: feedback-off-no-overrides
                       cmake-args: -DCONFIG_ZMK_DISPLAY=n -DCONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y
                     - name: feedback-off-all-overrides
@@ -50,3 +72,11 @@ jobs:
                     -DZMK_EXTRA_MODULES="$GITHUB_WORKSPACE" \
                     -DSHIELD=lf_test_dongle \
                     ${{ matrix.cmake-args }}
+            - name: Verify required-peripheral configuration
+              if: ${{ matrix.required_config != '' }}
+              working-directory: ${{ runner.temp }}/zmk-workspace
+              run: grep -Fx '${{ matrix.required_config }}' build/zephyr/.config
+            - name: Verify slot order configuration
+              if: ${{ matrix.slot_config != '' }}
+              working-directory: ${{ runner.temp }}/zmk-workspace
+              run: grep -Fx '${{ matrix.slot_config }}' build/zephyr/.config

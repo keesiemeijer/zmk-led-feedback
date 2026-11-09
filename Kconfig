@@ -62,14 +62,15 @@ config ZMK_LED_FEEDBACK_CONNECTION
     default y
     depends on ZMK_SPLIT
 
-config ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS
-    int "Number of essential peripherals (-1 = all)"
+config ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS
+    int "Number of required peripherals (-1 = all)"
     range -1 16
     default -1
-    depends on ZMK_LED_FEEDBACK_CONNECTION
+    depends on ZMK_LED_FEEDBACK_CONNECTION || ZMK_LED_FEEDBACK_BATTERY
     help
-      Only peripherals numbered 1 to N (see ZMK_LED_FEEDBACK_SLOT_ORDER) blink when they are not
-      connected. Higher numbered peripherals (for example a macropad) are optional and ignored.
+      Only peripherals numbered 1 to N (see ZMK_LED_FEEDBACK_SLOT_ORDER) trigger connection
+      warnings when disconnected. Higher numbered peripherals are optional. A value of 0 makes
+      all peripherals optional. Normal battery warnings still consider every peripheral.
 
 config ZMK_LED_FEEDBACK_SLOT_ORDER
     string "Peripheral LED number, in pairing order"

@@ -388,7 +388,7 @@ static int slot_number(int slot) {
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION)
 
 // Number of required peripherals to consider for blinking. If negative, all peripherals are required.
-#define REQUIRED (CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS < 0 ? PERIPHERALS : MIN(CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS, PERIPHERALS))
+#define REQUIRED (CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS < 0 ? PERIPHERALS : MIN(CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS, PERIPHERALS))
 
 // One flag per peripheral, in the order the peripherals first paired with the central.
 static atomic_t slot_connected[MAX(PERIPHERALS, 1)];

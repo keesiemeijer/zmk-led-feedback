@@ -149,7 +149,7 @@ Use them in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-
 | Option                                                    | Default | Description                                                                               |
 | --------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------- |
 | `CONFIG_ZMK_LED_FEEDBACK_CONNECTION`                      | `y`     | Enable connection warnings for disconnected peripherals.                                  |
-| `CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS` | `-1`    | Number of required peripherals (`-1` means all). Higher-numbered peripherals are ignored. |
+| `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS`            | `-1`    | Number of required peripherals (`-1` means all). Higher-numbered peripherals are ignored. |
 
 ### Battery feedback
 
