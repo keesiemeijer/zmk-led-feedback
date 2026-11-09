@@ -79,12 +79,15 @@ its deadline. Diagnostic warning and handoff tests belong to later stages.
 
 ## 3. Implement warning selection and patterns
 
+- Stage 3 adds diagnostic warning patterns. Display-control behavior and the complete deadline
+  handoff are still planned for stages 4 and 5, so use a display configured on for stage 3
+  hardware checks.
 - Continuously evaluate enabled feedback types in the specified priority order: missing required
   connections, any reported low battery below 15%, then missing required battery reports.
 - Reuse existing connection indication and implement continuous low-battery and generic
   missing-report patterns with the specified timing and LED counts.
 - Restart the selected pattern from its first phase when its type changes or feedback
-  interruptions end. Preserve the specified always-on layer behavior.
+  interruptions end. Preserve the specified always-on layer behavio{r.
 
 ### Stage 3 tests
 
@@ -104,13 +107,61 @@ its deadline. Diagnostic warning and handoff tests belong to later stages.
 
 **Hardware checks**
 
-1. With both feedback types enabled, boot with a required peripheral disconnected. Confirm its
-   red connection warning appears.
-2. Connect it and observe the battery diagnostic: yellow may appear while reports are missing,
-   then stop when healthy reports arrive.
-3. If a low-battery report is available, confirm the red/yellow warning appears. Use controlled
-   test reports for threshold boundary cases rather than relying on a battery reaching a
-   particular level.
+For each test, add the listed settings to the dongle's `.conf` file, then build and flash the
+dongle. These examples assume the LED feedback module and LED strip are already configured.
+Remove or change any conflicting settings in the same file. Required peripherals must have
+battery reporting enabled for their reports to reach the dongle.
+
+1. **Connection warning**
+
+   ```ini
+   CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+   CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+   CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+   CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
+   CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+   CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+   ```
+
+   Boot the dongle with a required peripheral powered off. Its red connection warning should
+   appear during the first 20 seconds.
+
+2. **Missing battery report**
+
+   ```ini
+   CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+   CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+   CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+   CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
+   CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+   CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+   ```
+
+   Boot with a required peripheral powered off, then connect it within 20 seconds. Once all
+   required peripherals are connected, yellow may appear while the dongle waits for battery
+   reports. It should stop when all required reports arrive, provided no battery is below 15%.
+   Reports may arrive too quickly to observe the yellow warning.
+
+3. **Low-battery warning**
+
+   ```ini
+   CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+   CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+   CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+   CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
+   CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+   CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+   ```
+
+   Boot with all required peripherals connected and at least one reporting a battery level
+   below 15%. When the report arrives during the first 20 seconds, the diagnostic should show
+   the repeating red/yellow warning.
+
+   The diagnostic threshold is fixed at 15%. Setting
+   `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=100` changes **normal** warnings after the
+   diagnostic; it does not make the diagnostic treat a healthy battery as low. If no peripheral
+   reports below 15%, skip this hardware check. The automated test covers the 14% and 15%
+   boundary using simulated reports.
 
 ## 4. Integrate display controls and interruptions
 
@@ -198,3 +249,4 @@ its deadline. Diagnostic warning and handoff tests belong to later stages.
    connection and battery reports take and whether warnings and handoff match the specification.
 2. Repeat with the diagnostic disabled and check that normal feedback behaves as before.
 3. Record any scenarios that could not be tested on hardware.
+   f

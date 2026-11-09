@@ -22,6 +22,11 @@
 
 #include <zmk_led_feedback.h>
 
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+#include "startup_diagnostic.h"
+static void diagnostic_refresh(void);
+#endif
+
 // Checks the battery level (if enabled) and triggers a warning if it falls below the configured threshold.
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY) && CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
 static void battery_warn_check(void);
@@ -315,6 +320,11 @@ static void layer_show_handler(struct k_work *work) {
 #endif
     draw_layer(preview, source);
     layer_active = true;
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+    if (startup_diagnostic_is_active()) {
+        diagnostic_refresh();
+    }
+#endif
     k_work_reschedule(&layer_clear_work, K_MSEC(CONFIG_ZMK_LED_FEEDBACK_LAYER_DURATION_MS));
 }
 
@@ -322,6 +332,12 @@ static void layer_show_handler(struct k_work *work) {
 static void layer_clear_handler(struct k_work *work) {
     layer_active = false;
 
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+    if (startup_diagnostic_is_active()) {
+        diagnostic_refresh();
+        return;
+    }
+#endif
     if (layer_stays_on()) {
         draw_layer(false, FEEDBACK_NONE);
     } else {
@@ -367,6 +383,7 @@ ZMK_SUBSCRIPTION(led_feedback_layer, zmk_layer_state_changed);
 
 //     Peripheral slot configuration for connection and battery feedback.
 #define PERIPHERALS CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS
+#define REQUIRED (CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS < 0 ? PERIPHERALS : MIN(CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS, PERIPHERALS))
 
 // Device number of a peripheral slot (the LEDs blinked while it is missing): the matching entry of the SLOT_ORDER list, or
 // slot + 1 when the entry is missing or invalid.
@@ -387,9 +404,6 @@ static int slot_number(int slot) {
 
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION)
 
-// Number of required peripherals to consider for blinking. If negative, all peripherals are required.
-#define REQUIRED (CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS < 0 ? PERIPHERALS : MIN(CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS, PERIPHERALS))
-
 // One flag per peripheral, in the order the peripherals first paired with the central.
 static atomic_t slot_connected[MAX(PERIPHERALS, 1)];
 static bool blink_on;
@@ -401,6 +415,11 @@ static K_WORK_DELAYABLE_DEFINE(blink_work, blink_handler);
 // Blinks a generic red warning when the strip is too short to identify every peripheral.
 // Otherwise, blinks the highest numbered missing required peripheral.
 static void blink_handler(struct k_work *work) {
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+    if (startup_diagnostic_is_active()) {
+        return;
+    }
+#endif
     if (!device_is_ready(strip)) {
         k_work_reschedule(&blink_work, K_MSEC(CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS));
         return;
@@ -468,6 +487,11 @@ static void set_connected(struct bt_conn *conn, bool connected) {
     int slot = zmk_ble_put_peripheral_addr(bt_conn_get_dst(conn));
     if (slot >= 0 && slot < PERIPHERALS) {
         atomic_set(&slot_connected[slot], connected);
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+        if (startup_diagnostic_is_active()) {
+            diagnostic_refresh();
+        }
+#endif
     }
 }
 
@@ -595,6 +619,15 @@ static void battery_layer_interrupt(void) {
 static void battery_finish(void) {
     battery_active = false;
 
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+    if (startup_diagnostic_is_active()) {
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
+        layer_active = false;
+#endif
+        diagnostic_refresh();
+        return;
+    }
+#endif
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
     // Clear the layer indication before finishing.
     layer_clear_handler(NULL);
@@ -776,6 +809,12 @@ static int battery_listener(const zmk_event_t *eh) {
     if (ev && ev->source < PERIPHERALS) {
         battery_level[ev->source] = ev->state_of_charge;
 
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+        if (startup_diagnostic_is_active()) {
+            diagnostic_refresh();
+            return ZMK_EV_EVENT_BUBBLE;
+        }
+#endif
 #if CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
         battery_warn_check();
 #endif
@@ -882,6 +921,11 @@ static void battery_start(int number) {
     }
 
     battery_take_over();
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+    if (startup_diagnostic_is_active()) {
+        diagnostic_refresh();
+    }
+#endif
     battery_shown = false;
     battery_number = number > 0 ? number : 1;
     battery_last = number > 0 ? number : PERIPHERALS;
@@ -898,3 +942,123 @@ void zmk_led_feedback_show_battery(int number) {
     battery_start(number);
 #endif
 }
+
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+static struct startup_pattern diagnostic_pattern;
+
+static void diagnostic_handler(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(diagnostic_work, diagnostic_handler);
+
+static void diagnostic_refresh(void) {
+    k_work_reschedule(&diagnostic_work, K_NO_WAIT);
+}
+
+static void diagnostic_handler(struct k_work *work) {
+    int64_t now = k_uptime_get();
+
+    if (now >= STARTUP_DIAGNOSTIC_DURATION_MS) {
+        diagnostic_pattern.warning = STARTUP_WARNING_NONE;
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
+        if (!battery_active)
+#endif
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
+        if (!layer_active)
+#endif
+        {
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
+            if (layer_stays_on() && leds_enabled) {
+                draw_layer(false, FEEDBACK_NONE);
+            } else
+#endif
+            {
+                update_strip(0, (struct led_rgb){0}, FEEDBACK_NONE);
+            }
+        }
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION)
+        k_work_reschedule(&blink_work, K_NO_WAIT);
+#endif
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY) && CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
+        battery_warn_check();
+#endif
+        return;
+    }
+
+    int64_t remaining = STARTUP_DIAGNOSTIC_DURATION_MS - now;
+    if (!device_is_ready(strip)
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
+        || layer_active
+#endif
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
+        || battery_active
+#endif
+    ) {
+        diagnostic_pattern.warning = STARTUP_WARNING_NONE;
+        k_work_reschedule(&diagnostic_work,
+                          K_MSEC(MIN(remaining, CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS)));
+        return;
+    }
+
+    struct startup_peripheral peripherals[MAX(PERIPHERALS, 1)];
+    for (int i = 0; i < PERIPHERALS; i++) {
+        peripherals[i].number = slot_number(i);
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION)
+        peripherals[i].connected = atomic_get(&slot_connected[i]) != 0;
+#else
+        peripherals[i].connected = false;
+#endif
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
+        peripherals[i].battery = battery_level[i];
+#else
+        peripherals[i].battery = 0;
+#endif
+    }
+
+    int missing;
+    enum startup_warning selected = startup_diagnostic_warning(
+        peripherals, PERIPHERALS, REQUIRED, IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION),
+        IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY), &missing);
+
+    struct startup_frame frame = startup_diagnostic_frame(
+        &diagnostic_pattern, selected, missing, now, CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS);
+
+    if (selected == STARTUP_WARNING_NONE) {
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
+        if (layer_stays_on() && leds_enabled) {
+            draw_layer(false, FEEDBACK_NONE);
+        } else
+#endif
+        {
+            update_strip(0, (struct led_rgb){0}, FEEDBACK_NONE);
+        }
+        k_work_reschedule(&diagnostic_work, K_MSEC(remaining));
+        return;
+    }
+
+    if (frame.changed) {
+        if (selected == STARTUP_WARNING_CONNECTION) {
+            int lit = STRIP_LEN < PERIPHERALS ? STRIP_LEN : missing;
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
+            if (frame.connection_gap && layer_stays_on() && leds_enabled) {
+                draw_layer(false, FEEDBACK_NONE);
+            } else
+#endif
+            {
+                update_strip(frame.color ? lit : 0, scale_rgb(frame.color),
+                             FEEDBACK_CONNECTION_WARNING);
+            }
+        } else {
+            update_strip(frame.color ? MIN(STRIP_LEN, 4) : 0, scale_rgb(frame.color),
+                         FEEDBACK_BATTERY_WARNING);
+        }
+    }
+
+    k_work_reschedule(&diagnostic_work, K_MSEC(MIN(remaining, frame.next_phase - now)));
+}
+
+static int diagnostic_init(void) {
+    diagnostic_refresh();
+    return 0;
+}
+
+SYS_INIT(diagnostic_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+#endif

@@ -34,6 +34,15 @@ jobs:
                           -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
                           -DCONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
                       diagnostic_config: CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+                    - name: diagnostic-combined-no-layer
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_LAYER=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
+                          -DCONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+                      diagnostic_config: CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
                     - name: connection-zero-required
                       cmake-args: >-
                           -DCONFIG_ZMK_DISPLAY=n
