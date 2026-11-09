@@ -247,7 +247,7 @@ and flash. The module and LED strip must already be configured.
     CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
     CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
     CONFIG_ZMK_LED_FEEDBACK_BATTERY=n
-    CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=0_#
+    CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=0
     CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y
     CONFIG_ZMK_LED_FEEDBACK_LAYER=y
     CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON=y
@@ -289,7 +289,7 @@ and flash. The module and LED strip must already be configured.
     does not qualify. The diagnostic threshold during the first 20 seconds remains fixed at 15%.
 
     To check the off override, repeat with `CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y` and
-    ` `: the normal warning should be
+    `CONFIG_ZMK_LED_FEEDBACK_OFF_OVERRIDES="battery_warning"`: the normal warning should be
     visible at handoff. Remove that override and repeat: it should be suppressed while off.
 
 ## 6. Document and validate the integrated feature
@@ -311,8 +311,130 @@ and flash. The module and LED strip must already be configured.
 
 **Hardware checks**
 
-1. Exercise a complete startup with the intended dongle and peripherals. Observe how long
-   connection and battery reports take and whether warnings and handoff match the specification.
-2. Repeat with the diagnostic disabled and check that normal feedback behaves as before.
-3. Record any scenarios that could not be tested on hardware.
-   f
+For each test, add the settings to the dongle's `.conf`, replacing conflicting settings, then
+build and flash. The module and LED strip must already be configured. Enable battery reporting
+on the peripherals, and have a battery feedback key available for test 2.
+
+1. **Complete startup and handoff**
+
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+    CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+    CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+    CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON=y
+    CONFIG_ZMK_LED_FEEDBACK_OFF_OVERRIDES=""
+    ```
+
+    1. Boot with one required peripheral disconnected. Confirm its red warning appears.
+    2. Connect it before 20 seconds have elapsed. Yellow may appear briefly while the battery
+       reports arrive. Note how long connection and battery reporting take.
+    3. Once all required reports arrive, the layer should appear if no peripheral battery is
+       below 15%.
+    4. At 20 seconds, the display should turn off, provided no display-control key was pressed.
+
+2. **Diagnostic disabled**
+
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=n
+    CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+    CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+    CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
+    ```
+
+    1. Boot with all required peripherals connected.
+    2. Disconnect a required peripheral and confirm its normal red connection warning appears.
+    3. Reconnect it and confirm the warning stops.
+    4. Use a battery feedback key and confirm normal battery feedback appears.
+
+Record any scenarios that could not be tested on hardware, including a diagnostic low-battery
+warning below 15% and custom slot ordering if those remain unavailable.
+
+## Startup diagnostic hardware checks
+
+These checks cover a low battery and reordered peripheral slots. Add each test's settings to
+the dongle's `.conf`, replacing conflicting settings, then build and flash the dongle. The
+module and LED strip must already be configured. Restore your usual settings after testing.
+
+### Low battery below 15%
+
+You need a peripheral that reports a battery level below 15% but above 0%. Enable battery
+reporting on the peripheral. A report of 0% is treated as no reading, not a low battery.
+
+```ini
+CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
+```
+
+1. Boot the dongle with all required peripherals connected.
+2. During the first 20 seconds, wait for the low battery report. A repeating red/yellow warning
+   with a dark pause should appear. Red connection warnings or yellow missing-report warnings
+   may appear first while peripherals connect and report.
+3. After 20 seconds, the diagnostic warning should stop. Normal battery warnings are disabled
+   by this configuration.
+
+The diagnostic threshold is fixed at 15%: changing the normal
+`CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL` cannot simulate a low diagnostic battery.
+If no peripheral reports below 15%, skip this hardware check; automated tests cover 14% and 15%.
+
+### Reordered slots: connection warning
+
+This example needs at least two previously paired peripherals. Identify the first and second
+paired peripherals before testing. With `"2,1"`, the first paired peripheral becomes device 2
+and is optional; the second becomes device 1 and is required. The example is for two configured
+peripheral slots; if you have more, add their numbers in order, for example `"2,1,3"` for three
+slots. Those additional peripherals are optional. The LED strip must have at least as many
+configured LEDs as peripheral slots to identify device numbers.
+
+```ini
+CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+CONFIG_ZMK_LED_FEEDBACK_BATTERY=n
+CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="2,1"
+CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
+CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
+```
+
+1. Boot with the first paired peripheral off and the second on. Once the second connects,
+   there should be no connection warning: the missing device 2 is optional.
+2. Reboot with the first paired peripheral on and the second off. During the first 20 seconds,
+   one red LED should blink, identifying the missing required device 1.
+3. Turn on the second paired peripheral. The red warning should stop when it connects.
+
+### Reordered slots: required battery reports
+
+Use the same two peripherals and slot ordering. Both should have battery reporting enabled and
+report at least 15%, as should any other connected peripherals. Connection feedback is disabled
+here so that a missing connection does not hide the missing-report warning. For more than two
+configured slots, extend the slot-order list as described above.
+
+```ini
+CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+CONFIG_ZMK_LED_FEEDBACK_CONNECTION=n
+CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="2,1"
+CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
+CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
+```
+
+1. Boot with the first paired peripheral off and the second on. Yellow may blink while waiting
+   for device 1's report, but should stop when it arrives. The missing optional device 2's
+   report should not keep the yellow warning active.
+2. Reboot with the first paired peripheral on and the second off. Yellow should keep blinking
+   during the diagnostic because required device 1 has not reported, even after optional
+   device 2 reports.
+3. Turn on the second paired peripheral before 20 seconds have elapsed. Yellow should stop
+   once its battery report arrives.
+
+See [peripheral numbering](docs/peripheral-numbering.md) and the
+[startup diagnostic guide](docs/startup-diagnostic.md) for details.

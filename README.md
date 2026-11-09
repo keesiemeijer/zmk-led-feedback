@@ -45,6 +45,12 @@ The dongle is designed to work with ZMK v0.3 (split) keyboards built with BLE-ca
 
 Use a BLE-capable controller board listed in [ZMK’s v0.3 supported hardware](https://v0-3-branch.zmk.dev/docs/hardware) and configure it as the central. The board must also support a LED-strip driver compatible with your strip. See the [dongle setup guide](docs/dongle-setup.md).
 
+> [!WARNING]
+> Do not use a battery-powered dongle with this module. Battery-powered operation and sleep/wake
+> behavior are not supported or tested. The module does not explicitly turn off the LED strip
+> before sleep, so the LEDs could remain lit or draw power, and the dongle may not wake as
+> expected.
+
 ### Tested controller boards
 
 - [supermini-nrf52840](https://github.com/joric/nrfmicro/wiki/Alternatives#supermini-nrf52840) (nicenano-v2 clone) controller board for the dongle.
@@ -149,10 +155,10 @@ Find out more about connection feedback in the [connection feedback documentatio
 
 Use them in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-file) file for the dongle:
 
-| Option                                                    | Default | Description                                                                               |
-| --------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------- |
-| `CONFIG_ZMK_LED_FEEDBACK_CONNECTION`                      | `y`     | Enable connection warnings for disconnected peripherals.                                  |
-| `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS`            | `-1`    | Number of required peripherals (`-1` means all). Higher-numbered peripherals are ignored. |
+| Option                                         | Default | Description                                                                               |
+| ---------------------------------------------- | ------- | ----------------------------------------------------------------------------------------- |
+| `CONFIG_ZMK_LED_FEEDBACK_CONNECTION`           | `y`     | Enable connection warnings for disconnected peripherals.                                  |
+| `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS` | `-1`    | Number of required peripherals (`-1` means all). Higher-numbered peripherals are ignored. |
 
 ### Battery feedback
 
