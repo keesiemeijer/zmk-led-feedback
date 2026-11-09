@@ -35,6 +35,16 @@ jobs:
                           -DCONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y
                           -DCONFIG_ZMK_LED_FEEDBACK_OFF_OVERRIDES=\"battery_feedback\"
                       diagnostic_config: CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+                    - name: diagnostic-handoff-battery-warning
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=100
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_REPEAT_MINUTES=1
+                          -DCONFIG_ZMK_LED_FEEDBACK_OFF_OVERRIDES=\"battery_warning\"
+                      diagnostic_config: CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
                     - name: diagnostic-battery-only
                       cmake-args: >-
                           -DCONFIG_ZMK_DISPLAY=n

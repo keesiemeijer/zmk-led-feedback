@@ -10,7 +10,7 @@ config ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC
     depends on ZMK_LED_FEEDBACK_CONNECTION || ZMK_LED_FEEDBACK_BATTERY
     help
       Enables connection and battery diagnostic warnings for the first 20 seconds after boot.
-      The full handoff behavior is still under development.
+      Normal configured feedback and warning behavior takes over afterward.
 
 config ZMK_LED_FEEDBACK_LAYER
     bool "Show the active layer when it changes"

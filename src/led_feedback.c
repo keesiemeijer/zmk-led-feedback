@@ -25,6 +25,14 @@
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
 #include "startup_diagnostic.h"
 static void diagnostic_refresh(void);
+static atomic_t diagnostic_finished;
+// Work handlers share the system queue; this also serializes external events and keycodes.
+static K_MUTEX_DEFINE(diagnostic_mutex);
+#define DIAGNOSTIC_LOCK() k_mutex_lock(&diagnostic_mutex, K_FOREVER)
+#define DIAGNOSTIC_UNLOCK() k_mutex_unlock(&diagnostic_mutex)
+#else
+#define DIAGNOSTIC_LOCK() do { } while (0)
+#define DIAGNOSTIC_UNLOCK() do { } while (0)
 #endif
 
 // Checks the battery level (if enabled) and triggers a warning if it falls below the configured threshold.
@@ -372,10 +380,12 @@ static void layer_clear_handler(struct k_work *work) {
 
 // ZMK layer events listener. Schedules the layer_show_handler when the layer state changes.
 static int layer_listener(const zmk_event_t *eh) {
+    DIAGNOSTIC_LOCK();
     if (device_is_ready(strip)) {
         layer_change_requested = true;
         k_work_reschedule(&layer_show_work, K_NO_WAIT);
     }
+    DIAGNOSTIC_UNLOCK();
     return ZMK_EV_EVENT_BUBBLE;
 }
 
@@ -502,6 +512,7 @@ static void set_connected(struct bt_conn *conn, bool connected) {
     }
 
     int slot = zmk_ble_put_peripheral_addr(bt_conn_get_dst(conn));
+    DIAGNOSTIC_LOCK();
     if (slot >= 0 && slot < PERIPHERALS) {
         atomic_set(&slot_connected[slot], connected);
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
@@ -510,6 +521,7 @@ static void set_connected(struct bt_conn *conn, bool connected) {
         }
 #endif
     }
+    DIAGNOSTIC_UNLOCK();
 }
 
 // Handles a successful Bluetooth connection event.
@@ -823,12 +835,14 @@ static int battery_listener(const zmk_event_t *eh) {
     const struct zmk_peripheral_battery_state_changed *ev =
         as_zmk_peripheral_battery_state_changed(eh);
 
+    DIAGNOSTIC_LOCK();
     if (ev && ev->source < PERIPHERALS) {
         battery_level[ev->source] = ev->state_of_charge;
 
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
         if (startup_diagnostic_is_active()) {
             diagnostic_refresh();
+            DIAGNOSTIC_UNLOCK();
             return ZMK_EV_EVENT_BUBBLE;
         }
 #endif
@@ -837,6 +851,7 @@ static int battery_listener(const zmk_event_t *eh) {
 #endif
     }
 
+    DIAGNOSTIC_UNLOCK();
     return ZMK_EV_EVENT_BUBBLE;
 }
 
@@ -859,6 +874,7 @@ static void show_preview(void) {
 
 // Changes the LED brightness in the specified direction and shows a preview.
 void zmk_led_feedback_change_brightness(int direction) {
+    DIAGNOSTIC_LOCK();
     brightness = CLAMP((int)brightness + direction * CONFIG_ZMK_LED_FEEDBACK_BRIGHTNESS_STEP,
                        CONFIG_ZMK_LED_FEEDBACK_MIN_BRIGHTNESS,
                        CONFIG_ZMK_LED_FEEDBACK_MAX_BRIGHTNESS);
@@ -872,30 +888,36 @@ void zmk_led_feedback_change_brightness(int direction) {
     }
 #endif
     show_preview();
+    DIAGNOSTIC_UNLOCK();
 }
 
 // Shows the current layer on the LED strip.
 void zmk_led_feedback_show_layer(void) {
+    DIAGNOSTIC_LOCK();
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
     if (device_is_ready(strip)) {
         layer_feedback_requested = true;
         k_work_reschedule(&layer_show_work, K_NO_WAIT);
     }
 #endif
+    DIAGNOSTIC_UNLOCK();
 }
 
 // Sets whether the layer indication should always be on.
 void zmk_led_feedback_set_layer_always_on(int mode) {
+    DIAGNOSTIC_LOCK();
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
     layer_always_on = mode < 0 ? !layer_always_on : mode > 0;
     if (device_is_ready(strip)) {
         k_work_reschedule(&layer_show_work, K_NO_WAIT);
     }
 #endif
+    DIAGNOSTIC_UNLOCK();
 }
 
 // Enables or disables the LED feedback.
 void zmk_led_feedback_set_enabled(int mode) {
+    DIAGNOSTIC_LOCK();
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
     bool diagnostic_active = startup_diagnostic_is_active();
     leds_enabled = startup_diagnostic_set_display(
@@ -909,6 +931,7 @@ void zmk_led_feedback_set_enabled(int mode) {
 #endif
 
     if (!device_is_ready(strip)) {
+        DIAGNOSTIC_UNLOCK();
         return;
     }
 
@@ -917,6 +940,7 @@ void zmk_led_feedback_set_enabled(int mode) {
     } else {
         update_strip(0, (struct led_rgb){0}, FEEDBACK_NONE);
     }
+    DIAGNOSTIC_UNLOCK();
 }
 
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
@@ -971,9 +995,11 @@ static void battery_start(int number) {
 
 // Shows the battery level of the device with this number (0 = all devices, one after another).
 void zmk_led_feedback_show_battery(int number) {
+    DIAGNOSTIC_LOCK();
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
     battery_start(number);
 #endif
+    DIAGNOSTIC_UNLOCK();
 }
 
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
@@ -983,21 +1009,45 @@ static void diagnostic_handler(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(diagnostic_work, diagnostic_handler);
 
 static void diagnostic_refresh(void) {
-    k_work_reschedule(&diagnostic_work, K_NO_WAIT);
+    if (!atomic_get(&diagnostic_finished)) {
+        k_work_reschedule(&diagnostic_work, K_NO_WAIT);
+    }
 }
 
 static void diagnostic_handler(struct k_work *work) {
+    DIAGNOSTIC_LOCK();
+    if (atomic_get(&diagnostic_finished)) {
+        DIAGNOSTIC_UNLOCK();
+        return;
+    }
     int64_t now = k_uptime_get();
 
     if (now >= STARTUP_DIAGNOSTIC_DURATION_MS) {
+        atomic_set(&diagnostic_finished, 1);
+        k_work_cancel_delayable(&diagnostic_work);
         diagnostic_pattern.warning = STARTUP_WARNING_NONE;
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
-        if (!battery_active)
-#endif
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
-        if (!layer_active)
+        k_work_cancel_delayable(&layer_show_work);
+        k_work_cancel_delayable(&layer_clear_work);
+        layer_active = false;
+        layer_feedback_requested = false;
+        layer_change_requested = false;
+        brightness_preview = false;
 #endif
-        {
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
+        battery_cancel();
+#if CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
+        battery_warned = false;
+#if WARNING_REPEAT
+        k_work_cancel_delayable(&warning_repeat_work);
+#endif
+#endif
+#endif
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION)
+        k_work_cancel_delayable(&blink_work);
+        blink_on = false;
+#endif
+        if (device_is_ready(strip)) {
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
             if (layer_stays_on() && leds_enabled) {
                 draw_layer(false, FEEDBACK_NONE);
@@ -1013,6 +1063,7 @@ static void diagnostic_handler(struct k_work *work) {
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY) && CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
         battery_warn_check();
 #endif
+        DIAGNOSTIC_UNLOCK();
         return;
     }
 
@@ -1028,6 +1079,7 @@ static void diagnostic_handler(struct k_work *work) {
         diagnostic_pattern.warning = STARTUP_WARNING_NONE;
         k_work_reschedule(&diagnostic_work,
                           K_MSEC(MIN(remaining, CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS)));
+        DIAGNOSTIC_UNLOCK();
         return;
     }
 
@@ -1035,6 +1087,7 @@ static void diagnostic_handler(struct k_work *work) {
         diagnostic_pattern.warning = STARTUP_WARNING_NONE;
         update_strip(0, (struct led_rgb){0}, FEEDBACK_NONE);
         k_work_reschedule(&diagnostic_work, K_MSEC(remaining));
+        DIAGNOSTIC_UNLOCK();
         return;
     }
 
@@ -1071,6 +1124,7 @@ static void diagnostic_handler(struct k_work *work) {
             update_strip(0, (struct led_rgb){0}, FEEDBACK_NONE);
         }
         k_work_reschedule(&diagnostic_work, K_MSEC(remaining));
+        DIAGNOSTIC_UNLOCK();
         return;
     }
 
@@ -1093,6 +1147,7 @@ static void diagnostic_handler(struct k_work *work) {
     }
 
     k_work_reschedule(&diagnostic_work, K_MSEC(MIN(remaining, frame.next_phase - now)));
+    DIAGNOSTIC_UNLOCK();
 }
 
 static int diagnostic_init(void) {
