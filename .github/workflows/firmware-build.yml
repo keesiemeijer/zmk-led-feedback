@@ -21,6 +21,19 @@ jobs:
                     - name: feedback-on
                       cmake-args: -DCONFIG_ZMK_DISPLAY=n
                       required_config: CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+                      diagnostic_config: '# CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC is not set'
+                    - name: diagnostic-connection
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+                      diagnostic_config: CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+                    - name: diagnostic-battery-only
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_CONNECTION=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+                      diagnostic_config: CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
                     - name: connection-zero-required
                       cmake-args: >-
                           -DCONFIG_ZMK_DISPLAY=n
@@ -80,3 +93,7 @@ jobs:
               if: ${{ matrix.slot_config != '' }}
               working-directory: ${{ runner.temp }}/zmk-workspace
               run: grep -Fx '${{ matrix.slot_config }}' build/zephyr/.config
+            - name: Verify diagnostic configuration
+              if: ${{ matrix.diagnostic_config != '' }}
+              working-directory: ${{ runner.temp }}/zmk-workspace
+              run: grep -Fx '${{ matrix.diagnostic_config }}' build/zephyr/.config

@@ -4,6 +4,14 @@ config ZMK_LED_FEEDBACK
 
 if ZMK_LED_FEEDBACK
 
+config ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC
+    bool "Enable startup diagnostic (in development)"
+    default n
+    depends on ZMK_LED_FEEDBACK_CONNECTION || ZMK_LED_FEEDBACK_BATTERY
+    help
+      Enables the startup diagnostic's 20-second boot-relative window. Diagnostic warnings
+      and handoff behavior are not implemented yet; normal feedback remains unchanged.
+
 config ZMK_LED_FEEDBACK_LAYER
     bool "Show the active layer when it changes"
     default y

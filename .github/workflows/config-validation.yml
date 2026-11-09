@@ -18,3 +18,9 @@ jobs:
         run: cmake -S tests/config-validation -B build/config-validation
       - name: Run tests
         run: ctest --test-dir build/config-validation --output-on-failure
+      - name: Configure and build startup diagnostic tests
+        run: |
+          cmake -S tests/startup-diagnostic -B build/startup-diagnostic
+          cmake --build build/startup-diagnostic
+      - name: Run startup diagnostic tests
+        run: ctest --test-dir build/startup-diagnostic --output-on-failure

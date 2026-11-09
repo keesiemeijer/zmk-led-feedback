@@ -1,6 +1,7 @@
 zephyr_include_directories(include)
 target_sources(app PRIVATE src/behavior_led_feedback.c src/behavior_led_feedback_battery.c)
 target_sources_ifdef(CONFIG_ZMK_LED_FEEDBACK app PRIVATE src/led_feedback.c)
+target_sources_ifdef(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC app PRIVATE src/startup_diagnostic.c)
 
 set(_lf_hex "[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]")
 
