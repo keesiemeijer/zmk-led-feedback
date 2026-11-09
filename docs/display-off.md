@@ -4,6 +4,9 @@ The LED feedback display can be [turned off with keycodes](#led-feedback-display
 
 While the LED display is off, feedback is suppressed unless you explicitly [allow selected feedback types](#override-feedback-types) with the `CONFIG_ZMK_LED_FEEDBACK_OFF_OVERRIDES` option below.
 
+The optional [startup diagnostic](startup-diagnostic.md#display-and-keycodes) temporarily turns
+the display on during its 20-second window, even if it is configured to start off.
+
 ## Configuration options
 
 Options to start with the LED feedback display turned off, and to provide overrides when the display is turned off.

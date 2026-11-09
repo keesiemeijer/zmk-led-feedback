@@ -37,6 +37,7 @@ static void reset_test(void) {
     layer_feedback_requested = false;
     layer_change_requested = false;
     brightness_preview = false;
+    blink_on = false;
     battery_active = false;
     battery_warning = false;
 #if CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
@@ -57,7 +58,72 @@ static void *run_diagnostic(void *arg) {
     return NULL;
 }
 
+static void test_complete_startup(void) {
+    reset_test();
+    uptime_ms = 0;
+    slot_connected[0] = 1;
+    slot_connected[1] = 0;
+    battery_level[0] = 0;
+    battery_level[1] = 0;
+    diagnostic_handler(NULL);
+    assert(diagnostic_pattern.warning == STARTUP_WARNING_CONNECTION);
+    assert(last_pixels[0].r > 0 && last_pixels[0].g == 0);
+
+    uptime_ms = 100;
+    slot_connected[1] = 1;
+    diagnostic_handler(NULL);
+    assert(diagnostic_pattern.warning == STARTUP_WARNING_MISSING_BATTERY);
+    assert(last_pixels[0].r > 0 && last_pixels[0].g > 0);
+
+    uptime_ms = 200;
+    struct zmk_peripheral_battery_state_changed event = {.source = 0, .state_of_charge = 10};
+    battery_listener(&event);
+    diagnostic_handler(NULL);
+    assert(diagnostic_pattern.warning == STARTUP_WARNING_LOW_BATTERY);
+    assert(last_pixels[0].r > 0 && last_pixels[0].g == 0);
+
+    uptime_ms = 300;
+    zmk_led_feedback_show_battery(1);
+    diagnostic_handler(NULL);
+    assert(battery_active && diagnostic_pattern.warning == STARTUP_WARNING_NONE);
+    battery_handler(NULL);
+    assert(last_pixels[0].r > 0);
+    uptime_ms = 1800;
+    battery_handler(NULL);
+    diagnostic_handler(NULL);
+    assert(diagnostic_pattern.warning == STARTUP_WARNING_LOW_BATTERY);
+    assert(last_pixels[0].r > 0 && last_pixels[0].g == 0);
+
+    uptime_ms = 20000;
+    diagnostic_handler(NULL);
+    assert(diagnostic_finished && !display_enabled());
+    assert(battery_level[0] == 10 && slot_connected[1]);
+#if CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
+    assert(battery_warned && warning_repeat_work.scheduled);
+#endif
+    int updates = strip_updates;
+    diagnostic_handler(NULL);
+    assert(strip_updates == updates && !diagnostic_work.scheduled);
+
+    reset_test();
+    uptime_ms = 19000;
+    zmk_led_feedback_set_enabled(1);
+    slot_connected[0] = 0;
+    battery_level[0] = 75;
+    diagnostic_handler(NULL);
+    assert(diagnostic_pattern.warning == STARTUP_WARNING_CONNECTION);
+    uptime_ms = 20000;
+    diagnostic_handler(NULL);
+    assert(blink_work.scheduled);
+    blink_handler(NULL);
+    assert(last_pixels[0].r > 0 && last_pixels[0].g == 0);
+    set_connected(NULL, true);
+    blink_handler(NULL);
+    assert(last_pixels[0].r == 0 && last_pixels[0].g == 0);
+}
+
 int main(void) {
+    test_complete_startup();
     reset_test();
     assert(display_enabled());
     battery_active = true;

@@ -5,7 +5,7 @@ config ZMK_LED_FEEDBACK
 if ZMK_LED_FEEDBACK
 
 config ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC
-    bool "Enable startup diagnostic (in development)"
+    bool "Enable startup diagnostic"
     default n
     depends on ZMK_LED_FEEDBACK_CONNECTION || ZMK_LED_FEEDBACK_BATTERY
     help

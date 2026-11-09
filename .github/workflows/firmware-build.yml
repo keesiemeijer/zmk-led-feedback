@@ -52,6 +52,17 @@ jobs:
                           -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
                           -DCONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
                       diagnostic_config: CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+                    - name: diagnostic-combined
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_LAYER=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+                      diagnostic_config: CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+                      layer_config: CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+                      connection_config: CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+                      battery_config: CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
                     - name: diagnostic-combined-no-layer
                       cmake-args: >-
                           -DCONFIG_ZMK_DISPLAY=n
@@ -124,3 +135,10 @@ jobs:
               if: ${{ matrix.diagnostic_config != '' }}
               working-directory: ${{ runner.temp }}/zmk-workspace
               run: grep -Fx '${{ matrix.diagnostic_config }}' build/zephyr/.config
+            - name: Verify combined feedback configuration
+              if: ${{ matrix.connection_config != '' }}
+              working-directory: ${{ runner.temp }}/zmk-workspace
+              run: |
+                  grep -Fx '${{ matrix.layer_config }}' build/zephyr/.config
+                  grep -Fx '${{ matrix.connection_config }}' build/zephyr/.config
+                  grep -Fx '${{ matrix.battery_config }}' build/zephyr/.config

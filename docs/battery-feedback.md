@@ -76,6 +76,10 @@ for strips with 1 to 10 LEDs.
 
 Set a battery warning threshold in the zmk-config [`.conf`](dongle-setup.md#dongle-configuration-file) file for the dongle.  This example triggers a battery warning when any peripheral battery drops below 15%. Set it to `0` (default) to disable warnings.
 
+The optional [startup diagnostic](startup-diagnostic.md) uses its own fixed 15% threshold during
+the first 20 seconds, even when normal low-battery warnings are disabled. The normal threshold,
+blink count, and repeat interval apply again after the diagnostic.
+
 ```ini
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
 ```

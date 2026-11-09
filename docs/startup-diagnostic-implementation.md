@@ -243,54 +243,54 @@ and flash. The module and LED strip must already be configured.
 
 1. **Restore display state and layer**
 
-   ```ini
-   CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
-   CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
-   CONFIG_ZMK_LED_FEEDBACK_BATTERY=n
-   CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=0
-   CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y
-   CONFIG_ZMK_LED_FEEDBACK_LAYER=y
-   CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON=y
-   ```
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+    CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=n
+    CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=0_#
+    CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON=y
+    ```
 
-   Boot without pressing display-control keys. The layer should be visible during the diagnostic
-   and turn off at handoff. Reboot and press `LF_ON` before 20 seconds have elapsed; the layer
-   should remain visible after handoff.
+    Boot without pressing display-control keys. The layer should be visible during the diagnostic
+    and turn off at handoff. Reboot and press `LF_ON` before 20 seconds have elapsed; the layer
+    should remain visible after handoff.
 
 2. **Continue normal connection warnings**
 
-   ```ini
-   CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
-   CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
-   CONFIG_ZMK_LED_FEEDBACK_BATTERY=n
-   CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
-   CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
-   ```
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+    CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=n
+    CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+    CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
+    ```
 
-   Boot with a required peripheral disconnected. Its red warning should appear during the
-   diagnostic and continue according to normal settings after 20 seconds. Reconnect it and
-   confirm the warning stops.
+    Boot with a required peripheral disconnected. Its red warning should appear during the
+    diagnostic and continue according to normal settings after 20 seconds. Reconnect it and
+    confirm the warning stops.
 
 3. **Normal battery warning after handoff**
 
-   ```ini
-   CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
-   CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
-   CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
-   CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
-   CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=100
-   CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_REPEAT_MINUTES=1
-   CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
-   ```
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+    CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+    CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=100
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_REPEAT_MINUTES=1
+    CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
+    ```
 
-   Boot with all required peripherals connected and battery reporting enabled. If at least one
-   reports a level below 100% before handoff, the normal red/yellow warning should start at
-   handoff and repeat after one minute while the condition persists. A report of exactly 100%
-   does not qualify. The diagnostic threshold during the first 20 seconds remains fixed at 15%.
+    Boot with all required peripherals connected and battery reporting enabled. If at least one
+    reports a level below 100% before handoff, the normal red/yellow warning should start at
+    handoff and repeat after one minute while the condition persists. A report of exactly 100%
+    does not qualify. The diagnostic threshold during the first 20 seconds remains fixed at 15%.
 
-   To check the off override, repeat with `CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y` and
-   `CONFIG_ZMK_LED_FEEDBACK_OFF_OVERRIDES="battery_warning"`: the normal warning should be
-   visible at handoff. Remove that override and repeat: it should be suppressed while off.
+    To check the off override, repeat with `CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y` and
+    ` `: the normal warning should be
+    visible at handoff. Remove that override and repeat: it should be suppressed while off.
 
 ## 6. Document and validate the integrated feature
 

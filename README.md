@@ -22,6 +22,8 @@ This module can also be used on regular (split) keyboards, but it only reports o
 - [Battery Status](#battery-feedback)
     - Shows the battery level of a peripheral (on request with a keycode).
     - Option to show a warning if batteries go beneath a threshold.
+- [Startup diagnostic](docs/startup-diagnostic.md)
+    - Checks connections and battery reports during the first 20 seconds after central boot.
 - [Keycodes](docs/keycodes.md)
     - Change the features displayed on the dongle with keycodes.
 - [Connection](docs/flashing-and-pairing.md#connecting-the-dongle-to-your-computer)
@@ -91,6 +93,7 @@ These options are shared between this module's feedback features. Use them in yo
 | Option                                                                               | Default | Description                                                                                                                                                                             |
 | ------------------------------------------------------------------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`CONFIG_ZMK_LED_FEEDBACK`](docs/dongle-setup.md#enable-the-led-feedback-module)     | `n`     | Enable this module.                                                                                                                                                                     |
+| [`CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC`](docs/startup-diagnostic.md)           | `n`     | Run connection and battery diagnostics for 20 seconds after central boot.                                                                                                               |
 | [`CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF`](docs/display-off.md#configuration-options)   | `n`     | Start with the LED display off.                                                                                                                                                         |
 | [`CONFIG_ZMK_LED_FEEDBACK_OFF_OVERRIDES`](docs/display-off.md#configuration-options) | `""`    | Comma-separated list of [feedback types](docs/display-off.md#override-feedback-types) allowed to show feedback temporarily while the display is off. Empty means no feedback overrides. |
 | `CONFIG_ZMK_LED_FEEDBACK_REVERSE`                                                    | `n`     | Start from the end of the LED strip                                                                                                                                                     |

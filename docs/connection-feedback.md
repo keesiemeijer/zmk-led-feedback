@@ -21,7 +21,9 @@ If the strip has fewer LEDs than configured peripherals, it blinks all LEDs as a
 Required peripherals trigger a [connection warning](#connection-warning). All configured peripheral slots are required by default. Use the `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS` option to set specific peripherals as required. Use this option in your zmk-config [`.conf`](dongle-setup.md#dongle-configuration-file) file for the dongle.
 
 This setting is available when either connection or battery feedback is enabled. It does not
-filter normal low-battery warnings, which consider every peripheral.
+filter normal low-battery warnings, which consider every peripheral. The optional
+[startup diagnostic](startup-diagnostic.md) also uses it to determine which battery reports
+are required.
 
 | Value | Result                                               |
 | ----- | ---------------------------------------------------- |
