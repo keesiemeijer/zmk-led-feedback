@@ -13,6 +13,9 @@
 #define STARTUP_DIAGNOSTIC_DURATION_MS 20000
 
 bool startup_diagnostic_is_active(void);
+bool startup_diagnostic_display_enabled(bool configured_enabled, bool explicitly_set, bool active);
+bool startup_diagnostic_set_display(bool configured_enabled, bool explicitly_set, bool active,
+                                    int mode);
 
 enum startup_warning {
     STARTUP_WARNING_NONE,

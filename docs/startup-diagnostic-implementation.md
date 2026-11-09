@@ -79,8 +79,8 @@ its deadline. Diagnostic warning and handoff tests belong to later stages.
 
 ## 3. Implement warning selection and patterns
 
-- Stage 3 adds diagnostic warning patterns. Display-control behavior and the complete deadline
-  handoff are still planned for stages 4 and 5, so use a display configured on for stage 3
+- Stage 3 adds diagnostic warning patterns. At this stage display-control behavior and the
+  complete deadline handoff are not yet implemented, so use a display configured on for stage 3
   hardware checks.
 - Continuously evaluate enabled feedback types in the specified priority order: missing required
   connections, any reported low battery below 15%, then missing required battery reports.
@@ -114,54 +114,54 @@ battery reporting enabled for their reports to reach the dongle.
 
 1. **Connection warning**
 
-   ```ini
-   CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
-   CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
-   CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
-   CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
-   CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
-   CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
-   ```
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+    CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
+    CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+    ```
 
-   Boot the dongle with a required peripheral powered off. Its red connection warning should
-   appear during the first 20 seconds.
+    Boot the dongle with a required peripheral powered off. Its red connection warning should
+    appear during the first 20 seconds.
 
 2. **Missing battery report**
 
-   ```ini
-   CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
-   CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
-   CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
-   CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
-   CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
-   CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
-   ```
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+    CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
+    CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+    ```
 
-   Boot with a required peripheral powered off, then connect it within 20 seconds. Once all
-   required peripherals are connected, yellow may appear while the dongle waits for battery
-   reports. It should stop when all required reports arrive, provided no battery is below 15%.
-   Reports may arrive too quickly to observe the yellow warning.
+    Boot with a required peripheral powered off, then connect it within 20 seconds. Once all
+    required peripherals are connected, yellow may appear while the dongle waits for battery
+    reports. It should stop when all required reports arrive, provided no battery is below 15%.
+    Reports may arrive too quickly to observe the yellow warning.
 
 3. **Low-battery warning**
 
-   ```ini
-   CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
-   CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
-   CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
-   CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
-   CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
-   CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
-   ```
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+    CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=n
+    CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+    ```
 
-   Boot with all required peripherals connected and at least one reporting a battery level
-   below 15%. When the report arrives during the first 20 seconds, the diagnostic should show
-   the repeating red/yellow warning.
+    Boot with all required peripherals connected and at least one reporting a battery level
+    below 15%. When the report arrives during the first 20 seconds, the diagnostic should show
+    the repeating red/yellow warning.
 
-   The diagnostic threshold is fixed at 15%. Setting
-   `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=100` changes **normal** warnings after the
-   diagnostic; it does not make the diagnostic treat a healthy battery as low. If no peripheral
-   reports below 15%, skip this hardware check. The automated test covers the 14% and 15%
-   boundary using simulated reports.
+    The diagnostic threshold is fixed at 15%. Setting
+    `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=100` changes **normal** warnings after the
+    diagnostic; it does not make the diagnostic treat a healthy battery as low. If no peripheral
+    reports below 15%, skip this hardware check. The automated test covers the 14% and 15%
+    boundary using simulated reports.
 
 ## 4. Integrate display controls and interruptions
 
@@ -187,11 +187,30 @@ battery reporting enabled for their reports to reach the dongle.
 
 **Hardware checks**
 
-1. Configure the display to start off and boot the dongle. Confirm diagnostic warnings and
-   ordinary feedback can be visible during the diagnostic.
-2. Press `LF_OFF` during a warning and confirm it stops. With a battery-feedback off override,
-   request a battery reading and confirm the diagnostic warning does not return afterward.
-3. Turn the display back on and confirm an applicable diagnostic warning resumes.
+Add the following to the dongle's `.conf`, replacing conflicting settings, and flash the
+firmware. These tests assume the module and LED strip are already configured and the keymap
+includes `LF_OFF`, `LF_ON`, `LF_TOG`, `LF_LAYER`, and an `&led_bat N` binding. Ensure a required
+peripheral is disconnected so a diagnostic connection warning remains active.
+
+```ini
+CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y
+CONFIG_ZMK_LED_FEEDBACK_OFF_OVERRIDES="battery_feedback"
+CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
+```
+
+1. Boot the dongle. During the first 20 seconds, confirm the red connection warning is visible
+   despite the configured display-off state. Request layer or battery feedback and confirm it
+   temporarily interrupts the warning. The warning should restart afterward.
+2. Reboot and press `LF_TOG` while the warning is visible. Confirm it turns the display off,
+   since the temporary effective state was on. Request battery feedback; it should be visible
+   due to the override, and the diagnostic warning should remain suppressed afterward.
+3. Before 20 seconds have elapsed, press `LF_ON`. Confirm the applicable diagnostic warning
+   resumes after any brightness preview. Repeat using `LF_OFF` to turn it off.
+
+The complete deadline handoff remains stage 5; do not use these checks to validate it.
 
 ## 5. Implement the deadline handoff
 

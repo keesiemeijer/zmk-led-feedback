@@ -27,6 +27,14 @@ jobs:
                           -DCONFIG_ZMK_DISPLAY=n
                           -DCONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
                       diagnostic_config: CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+                    - name: diagnostic-display-off-override
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_OFF_OVERRIDES=\"battery_feedback\"
+                      diagnostic_config: CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC=y
                     - name: diagnostic-battery-only
                       cmake-args: >-
                           -DCONFIG_ZMK_DISPLAY=n

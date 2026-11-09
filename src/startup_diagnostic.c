@@ -12,6 +12,16 @@ bool startup_diagnostic_is_active(void) {
     return k_uptime_get() < STARTUP_DIAGNOSTIC_DURATION_MS;
 }
 
+bool startup_diagnostic_display_enabled(bool configured_enabled, bool explicitly_set, bool active) {
+    return active && !explicitly_set ? true : configured_enabled;
+}
+
+bool startup_diagnostic_set_display(bool configured_enabled, bool explicitly_set, bool active,
+                                    int mode) {
+    return mode < 0 ? !startup_diagnostic_display_enabled(configured_enabled, explicitly_set, active)
+                    : mode > 0;
+}
+
 enum startup_warning startup_diagnostic_warning(const struct startup_peripheral *peripherals,
                                                 size_t count, int required,
                                                 bool connection_enabled, bool battery_enabled,

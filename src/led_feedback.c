@@ -72,10 +72,27 @@ enum feedback_source {
     FEEDBACK_BATTERY,
     FEEDBACK_BATTERY_WARNING,
     FEEDBACK_CONNECTION_WARNING,
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+    FEEDBACK_DIAGNOSTIC_WARNING,
+#endif
 };
 
 // Indicates whether the LEDs are currently enabled.
 static bool leds_enabled = !IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF);
+
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+static atomic_t diagnostic_display_explicit;
+#endif
+
+static bool display_enabled(void) {
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+    return startup_diagnostic_display_enabled(leds_enabled,
+                                              atomic_get(&diagnostic_display_explicit) != 0,
+                                              startup_diagnostic_is_active());
+#else
+    return leds_enabled;
+#endif
+}
 
 // Determines whether the specified feedback source can override the LED off state.
 static bool feedback_can_override_off(enum feedback_source source) {
@@ -122,7 +139,7 @@ static bool feedback_can_override_off(enum feedback_source source) {
 
 // Determines whether the specified feedback source can be shown on the LEDs.
 static bool feedback_can_show(enum feedback_source source) {
-    return leds_enabled || feedback_can_override_off(source);
+    return display_enabled() || feedback_can_override_off(source);
 }
 
 // Updates the LED strip with the specified number of lit LEDs and color.
@@ -457,7 +474,7 @@ static void blink_handler(struct k_work *work) {
 
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
     // With the layer always on, the layer is shown when the red LEDs are not.
-    if (layer_stays_on() && !blink_on && leds_enabled) {
+    if (layer_stays_on() && !blink_on && display_enabled()) {
         draw_layer(false, FEEDBACK_NONE);
     } else
 #endif
@@ -848,6 +865,12 @@ void zmk_led_feedback_change_brightness(int direction) {
 
     // Changing the brightness turns the LEDs on.
     leds_enabled = true;
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+    if (startup_diagnostic_is_active()) {
+        atomic_set(&diagnostic_display_explicit, 1);
+        diagnostic_refresh();
+    }
+#endif
     show_preview();
 }
 
@@ -873,7 +896,17 @@ void zmk_led_feedback_set_layer_always_on(int mode) {
 
 // Enables or disables the LED feedback.
 void zmk_led_feedback_set_enabled(int mode) {
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_STARTUP_DIAGNOSTIC)
+    bool diagnostic_active = startup_diagnostic_is_active();
+    leds_enabled = startup_diagnostic_set_display(
+        leds_enabled, atomic_get(&diagnostic_display_explicit) != 0, diagnostic_active, mode);
+    if (diagnostic_active) {
+        atomic_set(&diagnostic_display_explicit, 1);
+        diagnostic_refresh();
+    }
+#else
     leds_enabled = mode < 0 ? !leds_enabled : mode > 0;
+#endif
 
     if (!device_is_ready(strip)) {
         return;
@@ -998,6 +1031,13 @@ static void diagnostic_handler(struct k_work *work) {
         return;
     }
 
+    if (!display_enabled()) {
+        diagnostic_pattern.warning = STARTUP_WARNING_NONE;
+        update_strip(0, (struct led_rgb){0}, FEEDBACK_NONE);
+        k_work_reschedule(&diagnostic_work, K_MSEC(remaining));
+        return;
+    }
+
     struct startup_peripheral peripherals[MAX(PERIPHERALS, 1)];
     for (int i = 0; i < PERIPHERALS; i++) {
         peripherals[i].number = slot_number(i);
@@ -1023,7 +1063,7 @@ static void diagnostic_handler(struct k_work *work) {
 
     if (selected == STARTUP_WARNING_NONE) {
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
-        if (layer_stays_on() && leds_enabled) {
+        if (layer_stays_on() && display_enabled()) {
             draw_layer(false, FEEDBACK_NONE);
         } else
 #endif
@@ -1038,17 +1078,17 @@ static void diagnostic_handler(struct k_work *work) {
         if (selected == STARTUP_WARNING_CONNECTION) {
             int lit = STRIP_LEN < PERIPHERALS ? STRIP_LEN : missing;
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
-            if (frame.connection_gap && layer_stays_on() && leds_enabled) {
+            if (frame.connection_gap && layer_stays_on() && display_enabled()) {
                 draw_layer(false, FEEDBACK_NONE);
             } else
 #endif
             {
                 update_strip(frame.color ? lit : 0, scale_rgb(frame.color),
-                             FEEDBACK_CONNECTION_WARNING);
+                             FEEDBACK_DIAGNOSTIC_WARNING);
             }
         } else {
             update_strip(frame.color ? MIN(STRIP_LEN, 4) : 0, scale_rgb(frame.color),
-                         FEEDBACK_BATTERY_WARNING);
+                         FEEDBACK_DIAGNOSTIC_WARNING);
         }
     }
 

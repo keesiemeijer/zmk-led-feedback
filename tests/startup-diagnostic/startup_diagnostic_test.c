@@ -10,6 +10,19 @@ int64_t k_uptime_get(void) {
 }
 
 int main(void) {
+    assert(startup_diagnostic_display_enabled(false, false, true));
+    assert(startup_diagnostic_display_enabled(true, false, true));
+    assert(!startup_diagnostic_display_enabled(false, false, false));
+    assert(!startup_diagnostic_display_enabled(false, true, true));
+    assert(startup_diagnostic_display_enabled(true, true, true));
+    assert(!startup_diagnostic_set_display(false, false, true, -1));
+    assert(startup_diagnostic_set_display(false, true, true, -1));
+    assert(!startup_diagnostic_set_display(true, true, true, -1));
+    assert(!startup_diagnostic_set_display(true, false, true, 0));
+    assert(startup_diagnostic_set_display(false, true, true, 1));
+    assert(startup_diagnostic_set_display(false, false, false, -1));
+    assert(!startup_diagnostic_set_display(true, false, false, -1));
+
     uptime_ms = 0;
     assert(startup_diagnostic_is_active());
     uptime_ms = 1;
