@@ -1,5 +1,9 @@
 # zmk-led-feedback
 
+> [!WARNING]
+> This project is undergoing changes. Backward compatibility is not currently maintained;
+> updates may require changes to your configuration.
+
 A [ZMK](https://zmk.dev) module that shows the state of your keyboard on a small WS2812-style LED strip. It runs on the central, which makes it a good fit for a [dongle](https://zmk.dev/docs/hardware-integration/dongle). Use it with a single LED or as many as you want.
 
 When you add a dongle to your (split) keyboard setup it takes on the role of "**central**". All other parts of the keyboard are called "**peripherals**". For more information see ZMK's [central and peripheral roles](https://zmk.dev/docs/features/split-keyboards#central-and-peripheral-roles). In the rest of the documentation you can assume "the central" means "the dongle"
