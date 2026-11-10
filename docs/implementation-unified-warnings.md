@@ -163,6 +163,149 @@ first key press starts the new period, a running warning is stopped by the reset
 - Final full pass: config validation tests, firmware build, and the whole hardware checklist
   (all scenarios in the spec).
 
+## Hardware checks
+
+Automated tests can't check the blinking, so each stage ends with these checks on the dongle. Put
+the options in the dongle's `.conf` file, build the firmware from the `warning-types` branch, flash
+the dongle and reboot it. A stage's config replaces the previous one, only the lines shown are
+different from the base config.
+
+Terms:
+
+- A is peripheral 1 and B is peripheral 2 (device numbers from `SLOT_ORDER`).
+- "Battery low" means `BATTERY_WARNING_LEVEL` is above the percentage A reports. Read A's level
+  with the battery key first. Example: A reports 70, so use `80`.
+- "Layer key" is any key that changes the layer.
+- "Wait for the boot" means wait 40 seconds after the dongle starts and A and B are connected.
+
+### Base config
+
+```ini
+CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
+```
+
+Defaults: connection feedback on, 5 blinks, all peripherals required, blink interval 500 ms.
+Replace `80` with a value above A's level.
+
+### Stage 0 and 1: baseline and option rename
+
+Run on `main` first and write down what you see, then again after stage 1. The results must be the
+same (the battery warning didn't repeat by default).
+
+Config: base config.
+
+1. Turn on A and B and wait for the boot. Reboot the dongle. The battery warning shows 5 blinks
+   (red then yellow, 1 second pause), then nothing. Wait 10 minutes: no second warning.
+2. Reboot the dongle and press the layer key during the battery warning. The layer indication
+   shows, then one reminder blink, then nothing.
+3. With both on and the battery warning finished, turn off B. Write down what the dongle shows and
+   for how long. Press the layer key during it and write down what happens. Turn B on: it stops.
+4. Turn off B while the battery warning is running. Write down which warning shows first.
+
+Config for step 5: base config plus `CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3` (on `main` the name is
+`CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS=3`).
+
+5. Reboot the dongle: the battery warning is 3 blinks.
+
+Config for step 6: base config plus `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1` (on `main`
+`CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS=1`).
+
+6. Turn off B: no connection warning. Turn B on and turn off A: connection warning for A.
+
+### Stage 2: shared engine (no new behavior)
+
+Config: base config.
+
+1. Repeat steps 1 to 4 of stage 0 and 1. The results must match your notes, except step 4 (the
+   spec's priority rules apply: connection first, a running warning is never interrupted).
+
+### Stage 3: connection warning on the engine
+
+Config: base config, but with the battery warning off, plus 3 blinks:
+
+```ini
+CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
+```
+
+1. Turn on A and B and wait for the boot. Turn off B.
+2. The connection warning shows 3 blinks with 1 second pauses, then stops. Wait 2 minutes: nothing
+   more is shown while B is off.
+3. Turn B on, wait for it to connect, turn it off again: a new 3 blink warning.
+4. During a warning press the layer key: the layer indication shows, then one reminder blink, then
+   nothing.
+5. After a warning has finished press the layer key: no reminder blink.
+6. Turn off B, and turn it on again after the first blink: the warning stops right away.
+
+### Stage 4: boot warning
+
+Config: same as stage 3.
+
+1. Turn off B and reboot the dongle. The connection warning blinks continuously (no pauses). After
+   30 seconds it stops and nothing more is shown.
+2. After that turn B on, nothing shows. Turn it off: a regular 3 blink warning.
+3. Turn off B, reboot the dongle and turn B on after 10 seconds: the blinking stops when B
+   connects.
+4. Turn off B, reboot and press the layer key after 10 seconds: the layer indication shows, then
+   the continuous blinking resumes without a reminder blink, and stops at 30 seconds after boot.
+5. Add `CONFIG_ZMK_LED_FEEDBACK_CONNECTION=n`, reboot with B off: nothing blinks.
+
+### Stage 5: battery on required, connected peripherals
+
+Config: base config plus:
+
+```ini
+CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
+CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
+```
+
+1. A low, A and B connected: one low battery warning shows.
+2. Change `BATTERY_WARNING_LEVEL` to a value between the levels of A and B, so only B is low (B is
+   not required): no warning.
+3. With A low and connected, turn off A: the low battery warning stops right away and the
+   connection warning for A shows. Turn A on: the low battery warning shows again.
+
+### Stage 6: no reading warning
+
+Config: base config plus `CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3`. You need a peripheral that
+doesn't report a battery level (the battery key shows the "no reading" color). Use a peripheral
+without battery reporting for this.
+
+1. Reboot with both connected. Nothing shows in the first 30 seconds. At about 30 seconds 3 yellow
+   blinks show.
+2. With A low and the other peripheral without a reading: the low battery warning shows first,
+   then the yellow warning follows after it, once 30 seconds have passed.
+3. When a reading arrives the yellow warning stops right away.
+
+### Stage 7: inactivity reset
+
+Config: base config plus the lines below. 5 is the minimum value, use it in a local build only.
+
+```ini
+CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
+CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
+```
+
+1. Turn on A and B and wait for the boot. Turn off B and let the 3 blink warning finish.
+2. Don't press any key for 5 minutes. Nothing blinks during that time.
+3. Press a key: the continuous boot warning shows (up to 30 seconds) because B is still off. Turn
+   B on: it stops.
+4. Press a key within 5 minutes after any warning: no new warning (no new period).
+5. Repeat 1 and 2 with A low and its warning finished: the first key press gives the boot warning
+   (if B is off), then a new low battery warning.
+6. Set `CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=100`, turn off B and wait for the boot warning to
+   end, then don't press keys for 5 minutes and press one while the warning is still blinking. The
+   running warning stops and a new period starts.
+7. Set `CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=0` and repeat 1 and 2, then press a
+   key: nothing shows.
+
+### Stage 8: final pass
+
+Remove the blinks and inactivity lines (use the defaults) and repeat the checks of stages 3 to 5.
+Check the defaults: 5 blinks, about 10 seconds per warning, no inactivity reset.
+
 ## Risks
 
 - **Layer interaction.** Layer dismissal, the reminder blink, display off and `OFF_OVERRIDES`
