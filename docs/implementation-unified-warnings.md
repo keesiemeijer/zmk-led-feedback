@@ -311,11 +311,15 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
 
 1. Turn off B and reboot the dongle. The connection warning blinks continuously (no pauses). After
    30 seconds it stops and nothing more is shown.
+    - Expected results
 2. After that turn B on, nothing shows. Turn it off: a regular 3 blink warning.
+    - expected result
 3. Turn off B, reboot the dongle and turn B on after 10 seconds: the blinking stops when B
    connects.
+    - Expexted results
 4. Turn off B, reboot and press the layer key after 10 seconds: the layer indication shows, then
    the continuous blinking resumes without a reminder blink, and stops at 30 seconds after boot.
+    - expected results
 5. Flash the config below (connection feedback off), reboot with B off: nothing blinks.
 
     ```ini
@@ -325,6 +329,8 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
     CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
     CONFIG_ZMK_LED_FEEDBACK_CONNECTION=n
     ```
+
+    - Expected results
 
 ### Stage 5: battery on required, connected peripherals
 

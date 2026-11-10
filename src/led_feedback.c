@@ -414,7 +414,9 @@ static void feedback_idle(void) {
 }
 #endif
 
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION)
+// The connection state is tracked for the connection warning and to only check the battery of
+// connected peripherals.
+#if WARN_CONNECTION || WARN_BATTERY
 
 // Number of required peripherals to consider for blinking. If negative, all peripherals are required.
 #define REQUIRED (CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS < 0 ? PERIPHERALS : MIN(CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS, PERIPHERALS))
@@ -424,7 +426,7 @@ static atomic_t slot_connected[MAX(PERIPHERALS, 1)];
 
 // The device number of the highest numbered missing required peripheral, or 0 when all required
 // peripherals are connected.
-static int connection_missing(void) {
+static int __maybe_unused connection_missing(void) {
     int missing = 0;
 
     for (int i = 0; i < PERIPHERALS; i++) {
@@ -478,7 +480,7 @@ static int led_feedback_init(void) {
 // Initializes the LED feedback system for connection status. Checks the connections at boot.
 SYS_INIT(led_feedback_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
 
-#endif // CONFIG_ZMK_LED_FEEDBACK_CONNECTION
+#endif // WARN_CONNECTION || WARN_BATTERY
 
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
 
@@ -579,10 +581,11 @@ static void battery_handler(struct k_work *work) {
 }
 
 #if CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
-// Checks if any peripheral has a battery level below the warning threshold.
+// Checks if any required, connected peripheral has a battery level below the warning threshold.
+// A disconnected peripheral is covered by the connection warning and its last level is stale.
 static bool any_battery_low(void) {
     for (int i = 0; i < PERIPHERALS; i++) {
-        if (battery_level[i] > 0 &&
+        if (slot_number(i) <= REQUIRED && atomic_get(&slot_connected[i]) && battery_level[i] > 0 &&
             battery_level[i] < CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL) {
             return true;
         }
