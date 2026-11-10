@@ -265,6 +265,13 @@ Config: base config.
 1. Repeat steps 1 to 4 of stage 0 and 1. The results must match your notes, except step 4 (the
    spec's priority rules apply: connection first, a running warning is never interrupted).
 
+Known interim differences (the connection warning is still continuous until stage 3):
+
+- A battery warning waits while the connection warning runs, so with B off it only shows after
+  B reconnects.
+- Warnings wait until a layer indication has finished, instead of taking over the display.
+- The connection check is event driven instead of polling every 500 ms.
+
 ### Stage 3: connection warning on the engine
 
 Config for steps 1 to 6 (battery warning off, 3 blinks):

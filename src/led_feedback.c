@@ -22,13 +22,32 @@
 
 #include <zmk_led_feedback.h>
 
-// Checks the battery level (if enabled) and triggers a warning if it falls below the configured threshold.
+// The warning types that are enabled. The warning engine only exists when at least one is.
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION)
+#define WARN_CONNECTION 1
+#else
+#define WARN_CONNECTION 0
+#endif
+
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY) && CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
-static void battery_warn_check(void);
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
-static void battery_layer_resume(void);
+#define WARN_BATTERY 1
+#else
+#define WARN_BATTERY 0
 #endif
+
+#if WARN_CONNECTION || WARN_BATTERY
+// Asks the warning engine to check the warning conditions and start a warning if one is due.
+static void warning_request_check(void);
+// Dismisses the running warning for a layer indication.
+static void warning_layer_interrupt(void);
+// Stops the running warning, for a battery level display.
+static void warning_cancel(void);
+#else
+static inline void warning_request_check(void) {}
+static inline void warning_layer_interrupt(void) {}
+static inline void warning_cancel(void) {}
 #endif
+
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY) && IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
 static void battery_layer_interrupt(void);
 #endif
@@ -196,11 +215,6 @@ static void layer_clear_handler(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(layer_show_work, layer_show_handler);
 static K_WORK_DELAYABLE_DEFINE(layer_clear_work, layer_clear_handler);
 
-// Connection restart handler for when the connection status changes.
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION)
-static void connection_restart(void);
-#endif
-
 // Parses the "RRGGBB" entry of a comma separated list.
 static uint32_t palette_rgb(const char *list, int idx) {
     int count = 1;
@@ -315,7 +329,8 @@ static void layer_show_handler(struct k_work *work) {
         return;
     }
 
-    // Dismiss battery-level displays and defer interrupted warnings until the layer display clears.
+    // Dismiss warnings and battery-level displays. The warning engine resumes after the layer display clears.
+    warning_layer_interrupt();
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
     battery_layer_interrupt();
 #endif
@@ -334,13 +349,8 @@ static void layer_clear_handler(struct k_work *work) {
         update_strip(0, (struct led_rgb){0}, FEEDBACK_NONE);
     }
 
-    // Resume connection warnings and check for pending low-battery warnings.
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION)
-    connection_restart();
-#endif
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY) && CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
-    battery_layer_resume();
-#endif
+    // Resume interrupted warnings and start pending ones.
+    warning_request_check();
 }
 
 // ZMK layer events listener. Schedules the layer_show_handler when the layer state changes.
@@ -391,6 +401,19 @@ static int slot_number(int slot) {
 
 #endif
 
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION) || IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
+// Brings back the layer indication (or clears the strip) and lets the warnings resume.
+static void feedback_idle(void) {
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
+    // Also asks the warning engine to check for warnings.
+    layer_clear_handler(NULL);
+#else
+    update_strip(0, (struct led_rgb){0}, FEEDBACK_NONE);
+    warning_request_check();
+#endif
+}
+#endif
+
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION)
 
 // Number of required peripherals to consider for blinking. If negative, all peripherals are required.
@@ -398,35 +421,12 @@ static int slot_number(int slot) {
 
 // One flag per peripheral, in the order the peripherals first paired with the central.
 static atomic_t slot_connected[MAX(PERIPHERALS, 1)];
-static bool blink_on;
 
-static void blink_handler(struct k_work *work);
-
-static K_WORK_DELAYABLE_DEFINE(blink_work, blink_handler);
-
-// Blinks a generic red warning when the strip is too short to identify every peripheral.
-// Otherwise, blinks the highest numbered missing required peripheral.
-static void blink_handler(struct k_work *work) {
-    if (!device_is_ready(strip)) {
-        k_work_reschedule(&blink_work, K_MSEC(CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS));
-        return;
-    }
-
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
-    // The layer indication has priority and restarts the blinking when it is done.
-    if (layer_active) {
-        return;
-    }
-#endif
-
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
-    // The battery display restarts the blinking when it is done.
-    if (battery_active) {
-        return;
-    }
-#endif
-
+// The device number of the highest numbered missing required peripheral, or 0 when all required
+// peripherals are connected.
+static int connection_missing(void) {
     int missing = 0;
+
     for (int i = 0; i < PERIPHERALS; i++) {
         int number = slot_number(i);
 
@@ -434,34 +434,9 @@ static void blink_handler(struct k_work *work) {
             missing = MAX(missing, number);
         }
     }
-    // Use a generic warning when the strip can't identify every peripheral.
-    int lit = missing > 0 && STRIP_LEN < PERIPHERALS
-                  ? STRIP_LEN
-                  : missing;
 
-    // If no essential peripherals are missing, the LEDs will be off.
-    blink_on = missing > 0 && !blink_on;
-
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
-    // With the layer always on, the layer is shown when the red LEDs are not.
-    if (layer_stays_on() && !blink_on && leds_enabled) {
-        draw_layer(false, FEEDBACK_NONE);
-    } else
-#endif
-    {
-        update_strip(blink_on ? lit : 0, (struct led_rgb){.r = SCALE(255), .g = 0, .b = 0},
-                     FEEDBACK_CONNECTION_WARNING);
-    }
-    k_work_reschedule(&blink_work, K_MSEC(CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS));
+    return missing;
 }
-
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
-
-// Restarts the blinking work when the connection status changes.
-static void connection_restart(void) {
-    k_work_reschedule(&blink_work, K_MSEC(CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS));
-}
-#endif
 
 // Sets the connection status for a peripheral slot based on the Bluetooth connection.
 static void set_connected(struct bt_conn *conn, bool connected) {
@@ -474,6 +449,7 @@ static void set_connected(struct bt_conn *conn, bool connected) {
     int slot = zmk_ble_put_peripheral_addr(bt_conn_get_dst(conn));
     if (slot >= 0 && slot < PERIPHERALS) {
         atomic_set(&slot_connected[slot], connected);
+        warning_request_check();
     }
 }
 
@@ -495,11 +471,11 @@ BT_CONN_CB_DEFINE(led_feedback_conn_cb) = {
 };
 
 static int led_feedback_init(void) {
-    k_work_reschedule(&blink_work, K_MSEC(CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS));
+    warning_request_check();
     return 0;
 }
 
-// Initializes the LED feedback system for connection status. Schedules the initial blink work.
+// Initializes the LED feedback system for connection status. Checks the connections at boot.
 SYS_INIT(led_feedback_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
 
 #endif // CONFIG_ZMK_LED_FEEDBACK_CONNECTION
@@ -515,30 +491,9 @@ static int battery_number;
 static int battery_last;
 static bool battery_shown;
 
-// A warning blinks WARNING_BLINKS times, each blink red then yellow,
-// with a dark pause between the blinks. It is generic: at most WARNING_LEDS
-// LEDs light up, whichever peripheral is low. warning_step counts the steps
-// shown so far (red, yellow, pause).
-static bool battery_warning;
-static int warning_step;
-static int warning_step_limit;
-
-#define WARNING_BLINKS CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS
-#define WARNING_LEDS MIN(STRIP_LEN, 4) // Use at most 4 LEDs to conserve energy.
-#define WARNING_STEP_MS CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS
-#define WARNING_PAUSE_MS 1000
-
-#if CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
-static bool battery_warned;
-static bool battery_warning_reminder;
-#endif
-
 static void battery_handler(struct k_work *work);
 
 static K_WORK_DELAYABLE_DEFINE(battery_work, battery_handler);
-static void warning_handler(struct k_work *work);
-static void show_warning(int blinks);
-static K_WORK_DELAYABLE_DEFINE(warning_work, warning_handler);
 
 #define BATTERY_COLORS CONFIG_ZMK_LED_FEEDBACK_BATTERY_COLORS
 
@@ -559,82 +514,25 @@ static int battery_slot(int number) {
     return -1;
 }
 
-// Cancels any ongoing battery indication and warning work. Resets the battery state.
+// Cancels any ongoing battery indication and warning. Resets the battery state.
 static void battery_cancel(void) {
-#if CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
-    if (battery_warning) {
-        battery_warned = false;
-    }
-    battery_warning_reminder = false;
-#endif
+    warning_cancel();
     battery_active = false;
-    battery_warning = false;
     k_work_cancel_delayable(&battery_work);
-    k_work_cancel_delayable(&warning_work);
 }
 
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
-// Dismisses an active warning and queues one reminder blink after layer feedback.
+// Dismisses an active battery level display for a layer indication.
 static void battery_layer_interrupt(void) {
-#if CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
-    if (battery_warning) {
-        battery_warning_reminder = true;
-        battery_warning = false;
-        battery_active = false;
-        k_work_cancel_delayable(&battery_work);
-        k_work_cancel_delayable(&warning_work);
-        return;
-    }
-
-    if (battery_warning_reminder) {
-        battery_active = false;
-        k_work_cancel_delayable(&battery_work);
-        return;
-    }
-#endif
-    battery_cancel();
+    battery_active = false;
+    k_work_cancel_delayable(&battery_work);
 }
 #endif
 
-// Brings back the layer indication (or clears the strip) and the connection blinking.
+// Brings back the layer indication (or clears the strip) and lets the warnings resume.
 static void battery_finish(void) {
     battery_active = false;
-
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
-    // Clear the layer indication before finishing.
-    layer_clear_handler(NULL);
-#else
-    // Clear the strip if layer feedback is not enabled.
-    update_strip(0, (struct led_rgb){0}, FEEDBACK_NONE);
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION)
-    // Resume connection blinking if enabled.
-    k_work_reschedule(&blink_work, K_MSEC(CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS));
-#endif
-#if CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
-    battery_warn_check();
-#endif
-#endif
-}
-
-// Blinks red then yellow, then brings back the normal display.
-static void warning_handler(struct k_work *work) {
-    if (warning_step >= warning_step_limit) {
-        battery_warning = false;
-        battery_finish();
-        return;
-    }
-
-    int phase = warning_step % 3;
-
-    if (phase == 2) {
-        update_strip(0, (struct led_rgb){0}, FEEDBACK_BATTERY_WARNING);
-    } else {
-        update_strip(WARNING_LEDS, scale_rgb(phase ? 0xFFFF00 : 0xFF0000),
-                     FEEDBACK_BATTERY_WARNING);
-    }
-
-    warning_step++;
-    k_work_reschedule(&warning_work, K_MSEC(phase == 2 ? WARNING_PAUSE_MS : WARNING_STEP_MS));
+    feedback_idle();
 }
 
 // Shows one device at a time. The number of LEDs follows the charge and the color goes from
@@ -693,47 +591,6 @@ static bool any_battery_low(void) {
     return false;
 }
 
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
-// Shows one reminder blink after the layer display if the battery remains low.
-static void battery_layer_resume(void) {
-    if (battery_warning_reminder) {
-        if (!any_battery_low()) {
-            battery_warning_reminder = false;
-            battery_warned = false;
-            return;
-        }
-
-        battery_warning_reminder = false;
-        show_warning(1);
-        return;
-    }
-
-    battery_warn_check();
-}
-#endif
-
-// Starts the warning when a peripheral drops below the warning level.
-static void battery_warn_check(void) {
-    if (!any_battery_low()) {
-        battery_warned = false;
-        battery_warning_reminder = false;
-
-        // Stop a warning that is still blinking.
-        if (battery_warning) {
-            battery_cancel();
-            battery_finish();
-        }
-        return;
-    }
-
-    // If any peripheral is below the warning level, start the warning sequence.
-    if (battery_warned || battery_active) {
-        return;
-    }
-
-    battery_warned = true;
-    show_warning(WARNING_BLINKS);
-}
 #endif
 
 // Listener for peripheral battery state changes. Updates the battery level and triggers warnings if necessary.
@@ -743,10 +600,7 @@ static int battery_listener(const zmk_event_t *eh) {
 
     if (ev && ev->source < PERIPHERALS) {
         battery_level[ev->source] = ev->state_of_charge;
-
-#if CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
-        battery_warn_check();
-#endif
+        warning_request_check();
     }
 
     return ZMK_EV_EVENT_BUBBLE;
@@ -758,6 +612,226 @@ ZMK_LISTENER(led_feedback_battery, battery_listener);
 ZMK_SUBSCRIPTION(led_feedback_battery, zmk_peripheral_battery_state_changed);
 
 #endif // IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
+
+#if WARN_CONNECTION || WARN_BATTERY
+
+// The warning engine. One warning runs at a time. The types are in priority order: a running
+// warning is never interrupted, and when it ends the highest priority due warning starts.
+enum warning_type {
+    WARNING_CONNECTION,
+    WARNING_BATTERY,
+    WARNING_NONE,
+};
+
+#define WARNING_BLINKS CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS
+#define WARNING_LEDS MIN(STRIP_LEN, 4) // Use at most 4 LEDs to conserve energy.
+#define WARNING_STEP_MS CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS
+#define WARNING_PAUSE_MS 1000
+
+// The running warning, and the steps shown so far. A negative limit means it blinks until its
+// condition resolves.
+static enum warning_type warning_active = WARNING_NONE;
+static int warning_step;
+static int warning_step_limit;
+
+// A warned type doesn't start again until its condition resolved. A reminder is one blink that
+// follows a layer indication that dismissed the warning.
+static bool warning_warned[WARNING_NONE];
+static bool warning_reminder[WARNING_NONE];
+
+static void warning_handler(struct k_work *work);
+static void warning_check_handler(struct k_work *work);
+
+static K_WORK_DELAYABLE_DEFINE(warning_work, warning_handler);
+static K_WORK_DELAYABLE_DEFINE(warning_check_work, warning_check_handler);
+
+// True while the condition for the type holds.
+static bool warning_condition(enum warning_type type) {
+    switch (type) {
+#if WARN_CONNECTION
+    case WARNING_CONNECTION:
+        return connection_missing() > 0;
+#endif
+#if WARN_BATTERY
+    case WARNING_BATTERY:
+        return any_battery_low();
+#endif
+    default:
+        return false;
+    }
+}
+
+// A continuous warning blinks until its condition resolves and has no reminder.
+static bool warning_continuous(enum warning_type type) {
+    return type == WARNING_CONNECTION;
+}
+
+static enum feedback_source warning_source(enum warning_type type) {
+    return type == WARNING_CONNECTION ? FEEDBACK_CONNECTION_WARNING : FEEDBACK_BATTERY_WARNING;
+}
+
+// Shows a step of the running warning and returns the time to the next step in milliseconds.
+static int warning_draw(enum warning_type type, int step) {
+    enum feedback_source source = warning_source(type);
+
+#if WARN_CONNECTION
+    if (type == WARNING_CONNECTION) {
+        if (step % 2 == 0) {
+            int missing = connection_missing();
+            // Use a generic warning when the strip can't identify every peripheral.
+            int lit = missing > 0 && STRIP_LEN < PERIPHERALS ? STRIP_LEN : missing;
+
+            update_strip(lit, (struct led_rgb){.r = SCALE(255), .g = 0, .b = 0}, source);
+        }
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
+        // With the layer always on, the layer is shown when the red LEDs are not.
+        else if (layer_stays_on() && leds_enabled) {
+            draw_layer(false, FEEDBACK_NONE);
+        }
+#endif
+        else {
+            update_strip(0, (struct led_rgb){0}, source);
+        }
+
+        return WARNING_STEP_MS;
+    }
+#endif
+
+    // Blinks red then yellow, with a dark pause between the blinks.
+    int phase = step % 3;
+
+    if (phase == 2) {
+        update_strip(0, (struct led_rgb){0}, source);
+    } else {
+        update_strip(WARNING_LEDS, scale_rgb(phase ? 0xFFFF00 : 0xFF0000), source);
+    }
+
+    return phase == 2 ? WARNING_PAUSE_MS : WARNING_STEP_MS;
+}
+
+// Runs the steps of the warning, then brings back the normal display.
+static void warning_handler(struct k_work *work) {
+    if (warning_step_limit >= 0 && warning_step >= warning_step_limit) {
+        warning_active = WARNING_NONE;
+        feedback_idle();
+        return;
+    }
+
+    int delay = warning_draw(warning_active, warning_step);
+
+    warning_step++;
+    k_work_reschedule(&warning_work, K_MSEC(delay));
+}
+
+static void warning_start(enum warning_type type, int blinks) {
+    warning_active = type;
+    warning_step = 0;
+    warning_step_limit = warning_continuous(type) ? -1 : blinks * 3 - 1;
+    k_work_reschedule(&warning_work, K_NO_WAIT);
+}
+
+// Checks if the LED strip is free for a warning.
+static bool warning_strip_free(void) {
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
+    if (layer_active) {
+        return false;
+    }
+#endif
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
+    if (battery_active) {
+        return false;
+    }
+#endif
+
+    return warning_active == WARNING_NONE;
+}
+
+// Stops warnings whose condition resolved, and starts the highest priority warning that is due.
+static void warning_check_handler(struct k_work *work) {
+    if (!device_is_ready(strip)) {
+        k_work_reschedule(&warning_check_work, K_MSEC(WARNING_STEP_MS));
+        return;
+    }
+
+    for (int type = 0; type < WARNING_NONE; type++) {
+        if (warning_condition(type)) {
+            continue;
+        }
+
+        warning_warned[type] = false;
+        warning_reminder[type] = false;
+
+        if (warning_active == type) {
+            warning_active = WARNING_NONE;
+            k_work_cancel_delayable(&warning_work);
+            // Brings back the display and checks again.
+            feedback_idle();
+            return;
+        }
+    }
+
+    if (!warning_strip_free()) {
+        return;
+    }
+
+    for (int type = 0; type < WARNING_NONE; type++) {
+        if (!warning_condition(type)) {
+            continue;
+        }
+
+        if (warning_reminder[type]) {
+            warning_reminder[type] = false;
+            warning_start(type, 1);
+            return;
+        }
+
+        if (warning_continuous(type)) {
+            warning_start(type, 0);
+            return;
+        }
+
+        if (warning_warned[type]) {
+            continue;
+        }
+
+        warning_warned[type] = true;
+        if (feedback_can_show(warning_source(type))) {
+            warning_start(type, WARNING_BLINKS);
+            return;
+        }
+    }
+}
+
+static void warning_request_check(void) {
+    k_work_reschedule(&warning_check_work, K_NO_WAIT);
+}
+
+// A layer indication dismisses the warning. A continuous warning resumes after it, any other
+// warning gets one reminder blink.
+static void __maybe_unused warning_layer_interrupt(void) {
+    if (warning_active == WARNING_NONE) {
+        return;
+    }
+
+    warning_reminder[warning_active] = !warning_continuous(warning_active);
+    warning_active = WARNING_NONE;
+    k_work_cancel_delayable(&warning_work);
+}
+
+// A battery level display takes over the strip. The warning starts again after it.
+static void __maybe_unused warning_cancel(void) {
+    for (int type = 0; type < WARNING_NONE; type++) {
+        warning_reminder[type] = false;
+    }
+
+    if (warning_active != WARNING_NONE) {
+        warning_warned[warning_active] = false;
+        warning_active = WARNING_NONE;
+        k_work_cancel_delayable(&warning_work);
+    }
+}
+
+#endif // WARN_CONNECTION || WARN_BATTERY
 
 // Shows all LEDs in the first layer color as a preview of the new brightness.
 static void show_preview(void) {
@@ -827,19 +901,6 @@ static void battery_take_over(void) {
 #endif
 
     battery_active = true;
-}
-
-// Shows a battery warning on the LED strip.
-static void show_warning(int blinks) {
-    if (!device_is_ready(strip) || !feedback_can_show(FEEDBACK_BATTERY_WARNING)) {
-        return;
-    }
-
-    battery_take_over();
-    battery_warning = true;
-    warning_step = 0;
-    warning_step_limit = blinks * 3 - 1;
-    k_work_reschedule(&warning_work, K_NO_WAIT);
 }
 
 // Starts showing the battery level for the specified device number.
