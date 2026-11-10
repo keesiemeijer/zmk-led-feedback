@@ -372,6 +372,8 @@ CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
     CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=90
     CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
     CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
+
+
     CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="2,1"
     ```
 
@@ -388,12 +390,14 @@ Config for step 1 (with A at 87%, B connected without a reading):
 CONFIG_ZMK_LED_FEEDBACK_LAYER=y
 CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
+
 CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
 ```
 
 1. With both peripherals on, the reporting peripheral above the threshold, and the other connected
    but without a reading, reboot the dongle. Once both connect, no battery warning shows in the
    first 30 seconds. At about 30 seconds 3 yellow blinks show.
+   - Passed: B was flashed with battery service disabled.
 2. Flash the config below (with A at 87%, B connected without a reading) and reboot. The low battery
    warning shows first, then the yellow warning follows after it, once 30 seconds have passed.
 
@@ -404,9 +408,20 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
     CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
     ```
 
-3. Using either config, if the no-reading peripheral can be made to report a reading while the yellow warning runs,
-   do so: the warning stops when the reading arrives. Otherwise, turn it off during the yellow
-   warning: the warning stops when the dongle detects the disconnection.
+    - Passed.
+
+3. Flash the config below and reboot with both peripherals on. When the yellow warning starts, turn
+   off B. The warning stops when the dongle detects the disconnection; the longer warning allows
+   time for Bluetooth to detect it.
+
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=15
+    ```
+
+    - Passed. Stopping when a reading arrives was not tested.
 
 ### Stage 7: inactivity reset
 
