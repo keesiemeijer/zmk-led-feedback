@@ -62,15 +62,6 @@ config ZMK_LED_FEEDBACK_CONNECTION
     default y
     depends on ZMK_SPLIT
 
-config ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS
-    int "Number of essential peripherals (-1 = all)"
-    range -1 16
-    default -1
-    depends on ZMK_LED_FEEDBACK_CONNECTION
-    help
-      Only peripherals numbered 1 to N (see ZMK_LED_FEEDBACK_SLOT_ORDER) blink when they are not
-      connected. Higher numbered peripherals (for example a macropad) are optional and ignored.
-
 config ZMK_LED_FEEDBACK_SLOT_ORDER
     string "Peripheral LED number, in pairing order"
     default ""
@@ -108,24 +99,9 @@ config ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL
     help
       When the battery of any peripheral drops below this level, up to 4 LEDs blink, each blink
       red then yellow, with 1 second between the blinks. The warning doesn't say which
-      peripheral is low, check it with the battery keys. See
-      ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS and
-      ZMK_LED_FEEDBACK_BATTERY_WARNING_REPEAT_MINUTES. It starts again after no peripheral was
-      below this value any more, and then one drops below it again.
-
-config ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS
-    int "Number of times the warning blinks (1-1000)"
-    range 1 1000
-    default 5
-    depends on ZMK_LED_FEEDBACK_BATTERY
-    help
-      Only used when ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL is above 0.
-
-config ZMK_LED_FEEDBACK_BATTERY_WARNING_REPEAT_MINUTES
-    int "Minutes between repeated warnings while a battery stays low (0 = don't repeat)"
-    range 0 1440
-    default 0
-    depends on ZMK_LED_FEEDBACK_BATTERY
+      peripheral is low, check it with the battery keys. See ZMK_LED_FEEDBACK_WARNING_BLINKS.
+      It starts again after no peripheral was below this value any more, and then one drops
+      below it again.
 
 config ZMK_LED_FEEDBACK_BATTERY_DELAY_MS
     int "Time in milliseconds the LEDs stay off before the battery levels are shown"
@@ -136,6 +112,32 @@ config ZMK_LED_FEEDBACK_BATTERY_DURATION_MS
     int "Time in milliseconds the battery level of each device stays lit"
     default 1000
     depends on ZMK_LED_FEEDBACK_BATTERY
+
+config ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS
+    int "Number of essential peripherals (-1 = all)"
+    range -1 16
+    default -1
+    depends on ZMK_LED_FEEDBACK_CONNECTION || ZMK_LED_FEEDBACK_BATTERY
+    help
+      Only peripherals numbered 1 to N (see ZMK_LED_FEEDBACK_SLOT_ORDER) are checked by the
+      connection and battery warnings. Higher numbered peripherals (for example a macropad) are
+      optional and ignored.
+
+config ZMK_LED_FEEDBACK_WARNING_BLINKS
+    int "Number of times a warning blinks (1-1000)"
+    range 1 1000
+    default 5
+    depends on ZMK_LED_FEEDBACK_CONNECTION || ZMK_LED_FEEDBACK_BATTERY
+    help
+      Used by the connection and battery warnings.
+
+config ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES
+    int "Minutes without key activity before warnings are checked again (0 = off)"
+    range 0 1440
+    default 0
+    depends on ZMK_LED_FEEDBACK_CONNECTION || ZMK_LED_FEEDBACK_BATTERY
+    help
+      Only 0 (off) or 5 to 1440 are valid, anything else fails the build.
 
 config ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS
     int "Warning blink interval in milliseconds"

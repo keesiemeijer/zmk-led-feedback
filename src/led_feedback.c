@@ -44,6 +44,12 @@ static void battery_layer_interrupt(void);
 BUILD_ASSERT(CONFIG_ZMK_LED_FEEDBACK_MIN_BRIGHTNESS <= CONFIG_ZMK_LED_FEEDBACK_MAX_BRIGHTNESS,
              "CONFIG_ZMK_LED_FEEDBACK_MIN_BRIGHTNESS is higher than MAX_BRIGHTNESS");
 
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION) || IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
+BUILD_ASSERT(CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES == 0 ||
+                 CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES >= 5,
+             "CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES must be 0 (off) or 5 to 1440");
+#endif
+
 // Current brightness of the LED strip. Can be changed at runtime.
 static uint8_t brightness = CLAMP(CONFIG_ZMK_LED_FEEDBACK_BRIGHTNESS,
                                   CONFIG_ZMK_LED_FEEDBACK_MIN_BRIGHTNESS,
@@ -388,7 +394,7 @@ static int slot_number(int slot) {
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION)
 
 // Number of required peripherals to consider for blinking. If negative, all peripherals are required.
-#define REQUIRED (CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS < 0 ? PERIPHERALS : MIN(CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS, PERIPHERALS))
+#define REQUIRED (CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS < 0 ? PERIPHERALS : MIN(CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS, PERIPHERALS))
 
 // One flag per peripheral, in the order the peripherals first paired with the central.
 static atomic_t slot_connected[MAX(PERIPHERALS, 1)];
@@ -509,7 +515,7 @@ static int battery_number;
 static int battery_last;
 static bool battery_shown;
 
-// A warning blinks BATTERY_WARNING_BLINKS times, each blink red then yellow,
+// A warning blinks WARNING_BLINKS times, each blink red then yellow,
 // with a dark pause between the blinks. It is generic: at most WARNING_LEDS
 // LEDs light up, whichever peripheral is low. warning_step counts the steps
 // shown so far (red, yellow, pause).
@@ -517,9 +523,8 @@ static bool battery_warning;
 static int warning_step;
 static int warning_step_limit;
 
-#define WARNING_BLINKS CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS
+#define WARNING_BLINKS CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS
 #define WARNING_LEDS MIN(STRIP_LEN, 4) // Use at most 4 LEDs to conserve energy.
-#define WARNING_REPEAT (CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_REPEAT_MINUTES > 0)
 #define WARNING_STEP_MS CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS
 #define WARNING_PAUSE_MS 1000
 
@@ -676,9 +681,6 @@ static void battery_handler(struct k_work *work) {
 }
 
 #if CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
-#define WARNING_REPEAT_MS (CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_REPEAT_MINUTES * 60 * 1000)
-#define WARNING_RETRY_MS 10000
-
 // Checks if any peripheral has a battery level below the warning threshold.
 static bool any_battery_low(void) {
     for (int i = 0; i < PERIPHERALS; i++) {
@@ -690,31 +692,6 @@ static bool any_battery_low(void) {
 
     return false;
 }
-
-#if WARNING_REPEAT
-static void warning_repeat_handler(struct k_work *work);
-static K_WORK_DELAYABLE_DEFINE(warning_repeat_work, warning_repeat_handler);
-
-// Warns again while a peripheral is still below the warning level.
-// When the strip is busy, it tries again soon.
-static void warning_repeat_handler(struct k_work *work) {
-    if (!any_battery_low()) {
-        return;
-    }
-
-    if (battery_active
-#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
-        || layer_active
-#endif
-    ) {
-        k_work_reschedule(&warning_repeat_work, K_MSEC(WARNING_RETRY_MS));
-        return;
-    }
-
-    show_warning(WARNING_BLINKS);
-    k_work_reschedule(&warning_repeat_work, K_MSEC(WARNING_REPEAT_MS));
-}
-#endif
 
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
 // Shows one reminder blink after the layer display if the battery remains low.
@@ -728,9 +705,6 @@ static void battery_layer_resume(void) {
 
         battery_warning_reminder = false;
         show_warning(1);
-#if WARNING_REPEAT
-        k_work_reschedule(&warning_repeat_work, K_MSEC(WARNING_REPEAT_MS));
-#endif
         return;
     }
 
@@ -738,7 +712,7 @@ static void battery_layer_resume(void) {
 }
 #endif
 
-// Starts the warning when a peripheral drops below the warning level, and repeats it later.
+// Starts the warning when a peripheral drops below the warning level.
 static void battery_warn_check(void) {
     if (!any_battery_low()) {
         battery_warned = false;
@@ -749,9 +723,6 @@ static void battery_warn_check(void) {
             battery_cancel();
             battery_finish();
         }
-#if WARNING_REPEAT
-        k_work_cancel_delayable(&warning_repeat_work);
-#endif
         return;
     }
 
@@ -762,9 +733,6 @@ static void battery_warn_check(void) {
 
     battery_warned = true;
     show_warning(WARNING_BLINKS);
-#if WARNING_REPEAT
-    k_work_reschedule(&warning_repeat_work, K_MSEC(WARNING_REPEAT_MS));
-#endif
 }
 #endif
 

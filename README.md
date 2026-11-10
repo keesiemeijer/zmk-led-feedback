@@ -149,7 +149,7 @@ Use them in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-
 | Option                                                    | Default | Description                                                                               |
 | --------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------- |
 | `CONFIG_ZMK_LED_FEEDBACK_CONNECTION`                      | `y`     | Enable connection warnings for disconnected peripherals.                                  |
-| `CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS` | `-1`    | Number of required peripherals (`-1` means all). Higher-numbered peripherals are ignored. |
+| `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS` | `-1`    | Number of required peripherals (`-1` means all). Higher-numbered peripherals are ignored. |
 
 ### Battery feedback
 
@@ -181,8 +181,7 @@ Use them in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY`                        | `n`                             | Enable the `led_bat` behavior and peripheral battery-level fetching. |
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_COLORS`                 | `"00FF00,FFFF00,FF0000,0000FF"` | Battery colors in order: high, medium, low, no reading.              |
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL`          | `0`                             | Warn below this battery percentage; `0` disables warnings.           |
-| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_REPEAT_MINUTES` | `0`                             | Repeat interval while a battery remains low; `0` disables repeats.   |
-| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS`         | `5`                             | Number of warning blinks (1–1000).                                   |
+| `CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS`         | `5`                             | Number of warning blinks (1–1000).                                   |
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_DELAY_MS`               | `500`                           | Off time after a battery key press before the first level appears.   |
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_DURATION_MS`            | `1000`                          | How long each device's battery level stays lit.                      |
 
