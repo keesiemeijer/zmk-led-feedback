@@ -628,8 +628,8 @@ enum warning_type {
 #define WARNING_STEP_MS CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS
 #define WARNING_PAUSE_MS 1000
 
-// The running warning, and the steps shown so far. A negative limit means it blinks until its
-// condition resolves.
+// The running warning, and the steps shown so far. A blink is three steps: two lit or dark steps
+// and a pause.
 static enum warning_type warning_active = WARNING_NONE;
 static int warning_step;
 static int warning_step_limit;
@@ -661,11 +661,6 @@ static bool warning_condition(enum warning_type type) {
     }
 }
 
-// A continuous warning blinks until its condition resolves and has no reminder.
-static bool warning_continuous(enum warning_type type) {
-    return type == WARNING_CONNECTION;
-}
-
 static enum feedback_source warning_source(enum warning_type type) {
     return type == WARNING_CONNECTION ? FEEDBACK_CONNECTION_WARNING : FEEDBACK_BATTERY_WARNING;
 }
@@ -676,7 +671,9 @@ static int warning_draw(enum warning_type type, int step) {
 
 #if WARN_CONNECTION
     if (type == WARNING_CONNECTION) {
-        if (step % 2 == 0) {
+        int phase = step % 3;
+
+        if (phase == 0) {
             int missing = connection_missing();
             // Use a generic warning when the strip can't identify every peripheral.
             int lit = missing > 0 && STRIP_LEN < PERIPHERALS ? STRIP_LEN : missing;
@@ -693,7 +690,7 @@ static int warning_draw(enum warning_type type, int step) {
             update_strip(0, (struct led_rgb){0}, source);
         }
 
-        return WARNING_STEP_MS;
+        return phase == 2 ? WARNING_PAUSE_MS : WARNING_STEP_MS;
     }
 #endif
 
@@ -711,7 +708,7 @@ static int warning_draw(enum warning_type type, int step) {
 
 // Runs the steps of the warning, then brings back the normal display.
 static void warning_handler(struct k_work *work) {
-    if (warning_step_limit >= 0 && warning_step >= warning_step_limit) {
+    if (warning_step >= warning_step_limit) {
         warning_active = WARNING_NONE;
         feedback_idle();
         return;
@@ -726,7 +723,7 @@ static void warning_handler(struct k_work *work) {
 static void warning_start(enum warning_type type, int blinks) {
     warning_active = type;
     warning_step = 0;
-    warning_step_limit = warning_continuous(type) ? -1 : blinks * 3 - 1;
+    warning_step_limit = blinks * 3 - 1;
     k_work_reschedule(&warning_work, K_NO_WAIT);
 }
 
@@ -785,11 +782,6 @@ static void warning_check_handler(struct k_work *work) {
             return;
         }
 
-        if (warning_continuous(type)) {
-            warning_start(type, 0);
-            return;
-        }
-
         if (warning_warned[type]) {
             continue;
         }
@@ -806,14 +798,13 @@ static void warning_request_check(void) {
     k_work_reschedule(&warning_check_work, K_NO_WAIT);
 }
 
-// A layer indication dismisses the warning. A continuous warning resumes after it, any other
-// warning gets one reminder blink.
+// A layer indication dismisses the warning. After it the warning gets one reminder blink.
 static void __maybe_unused warning_layer_interrupt(void) {
     if (warning_active == WARNING_NONE) {
         return;
     }
 
-    warning_reminder[warning_active] = !warning_continuous(warning_active);
+    warning_reminder[warning_active] = true;
     warning_active = WARNING_NONE;
     k_work_cancel_delayable(&warning_work);
 }
