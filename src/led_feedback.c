@@ -38,6 +38,9 @@
 #if WARN_CONNECTION || WARN_BATTERY
 // Asks the warning engine to check the warning conditions and start a warning if one is due.
 static void warning_request_check(void);
+#if WARN_BATTERY
+static void warning_schedule_boot_check(void);
+#endif
 // Dismisses the running warning for a layer indication.
 static void warning_layer_interrupt(void);
 // Stops the running warning, for a battery level display.
@@ -401,6 +404,11 @@ static int slot_number(int slot) {
 
 #endif
 
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
+// A zero level represents no reading for the current connection.
+static atomic_t battery_level[PERIPHERALS];
+#endif
+
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION) || IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
 // Brings back the layer indication (or clears the strip) and lets the warnings resume.
 static void feedback_idle(void) {
@@ -450,6 +458,11 @@ static void set_connected(struct bt_conn *conn, bool connected) {
 
     int slot = zmk_ble_put_peripheral_addr(bt_conn_get_dst(conn));
     if (slot >= 0 && slot < PERIPHERALS) {
+#if WARN_BATTERY
+        if (!connected) {
+            atomic_set(&battery_level[slot], 0);
+        }
+#endif
         atomic_set(&slot_connected[slot], connected);
         warning_request_check();
     }
@@ -474,6 +487,9 @@ BT_CONN_CB_DEFINE(led_feedback_conn_cb) = {
 
 static int led_feedback_init(void) {
     warning_request_check();
+#if WARN_BATTERY
+    warning_schedule_boot_check();
+#endif
     return 0;
 }
 
@@ -483,10 +499,6 @@ SYS_INIT(led_feedback_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
 #endif // WARN_CONNECTION || WARN_BATTERY
 
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
-
-// Last reported battery level (0-100) per peripheral slot. 0 means no reading:
-// nothing reported yet, or the peripheral disconnected (the central reports 0 then).
-static uint8_t battery_level[PERIPHERALS];
 
 // The device numbers still to show, and whether the last step was a display (not a gap).
 static int battery_number;
@@ -557,7 +569,7 @@ static void battery_handler(struct k_work *work) {
     }
 
     int slot = battery_slot(battery_number);
-    uint8_t level = slot >= 0 ? battery_level[slot] : 0;
+    uint8_t level = slot >= 0 ? atomic_get(&battery_level[slot]) : 0;
     int lit = 1;
     uint32_t rgb = battery_color(3);
 
@@ -581,12 +593,27 @@ static void battery_handler(struct k_work *work) {
 }
 
 #if CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL > 0
+static bool battery_is_required_and_connected(int slot) {
+    return slot_number(slot) <= REQUIRED && atomic_get(&slot_connected[slot]);
+}
+
 // Checks if any required, connected peripheral has a battery level below the warning threshold.
 // A disconnected peripheral is covered by the connection warning and its last level is stale.
 static bool any_battery_low(void) {
     for (int i = 0; i < PERIPHERALS; i++) {
-        if (slot_number(i) <= REQUIRED && atomic_get(&slot_connected[i]) && battery_level[i] > 0 &&
-            battery_level[i] < CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL) {
+        atomic_val_t level = atomic_get(&battery_level[i]);
+        if (battery_is_required_and_connected(i) && level > 0 &&
+            level < CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool any_battery_missing(void) {
+    for (int i = 0; i < PERIPHERALS; i++) {
+        if (battery_is_required_and_connected(i) && atomic_get(&battery_level[i]) == 0) {
             return true;
         }
     }
@@ -602,7 +629,7 @@ static int battery_listener(const zmk_event_t *eh) {
         as_zmk_peripheral_battery_state_changed(eh);
 
     if (ev && ev->source < PERIPHERALS) {
-        battery_level[ev->source] = ev->state_of_charge;
+        atomic_set(&battery_level[ev->source], ev->state_of_charge);
         warning_request_check();
     }
 
@@ -622,6 +649,7 @@ ZMK_SUBSCRIPTION(led_feedback_battery, zmk_peripheral_battery_state_changed);
 // warning is never interrupted, and when it ends the highest priority due warning starts.
 enum warning_type {
     WARNING_CONNECTION,
+    WARNING_BATTERY_NO_READING,
     WARNING_BATTERY,
     WARNING_NONE,
 };
@@ -662,6 +690,19 @@ static void warning_check_handler(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(warning_work, warning_handler);
 static K_WORK_DELAYABLE_DEFINE(warning_check_work, warning_check_handler);
 
+#if WARN_BATTERY
+static void warning_boot_check_handler(struct k_work *work) {
+    warning_request_check();
+}
+
+static K_WORK_DELAYABLE_DEFINE(warning_boot_check_work, warning_boot_check_handler);
+
+static void warning_schedule_boot_check(void) {
+    int64_t remaining = MAX(0, BOOT_WARNING_MS - k_uptime_get());
+    k_work_schedule(&warning_boot_check_work, K_MSEC(remaining));
+}
+#endif
+
 // True while the condition for the type holds.
 static bool warning_condition(enum warning_type type) {
     switch (type) {
@@ -670,6 +711,8 @@ static bool warning_condition(enum warning_type type) {
         return connection_missing() > 0;
 #endif
 #if WARN_BATTERY
+    case WARNING_BATTERY_NO_READING:
+        return boot_expired() && any_battery_missing();
     case WARNING_BATTERY:
         return any_battery_low();
 #endif
@@ -711,13 +754,15 @@ static int warning_draw(enum warning_type type, int step) {
     }
 #endif
 
-    // Blinks red then yellow, with a dark pause between the blinks.
+    // Low battery blinks red then yellow; no reading blinks yellow for both steps.
     int phase = step % 3;
 
     if (phase == 2) {
         update_strip(0, (struct led_rgb){0}, source);
     } else {
-        update_strip(WARNING_LEDS, scale_rgb(phase ? 0xFFFF00 : 0xFF0000), source);
+        update_strip(WARNING_LEDS,
+                     scale_rgb(type == WARNING_BATTERY_NO_READING || phase ? 0xFFFF00 : 0xFF0000),
+                     source);
     }
 
     return phase == 2 ? WARNING_PAUSE_MS : WARNING_STEP_MS;
