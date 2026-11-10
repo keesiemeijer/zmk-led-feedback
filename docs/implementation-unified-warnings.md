@@ -12,10 +12,10 @@ decides behavior, this file decides order and verification.
   [CMakeLists.txt](../CMakeLists.txt) (text options) and `BUILD_ASSERT` in `led_feedback.c`
   (numbers).
 - Tests available:
-  - `tests/config-validation`: CMake/ctest cases for the CMake checks only. It cannot test
-    Kconfig ranges or `BUILD_ASSERT`.
-  - `tests/firmware-build`: real ZMK firmware build in CI (`lf_test_dongle.conf`). It proves the
-    code compiles and the Kconfig is valid, not the runtime behavior.
+    - `tests/config-validation`: CMake/ctest cases for the CMake checks only. It cannot test
+      Kconfig ranges or `BUILD_ASSERT`.
+    - `tests/firmware-build`: real ZMK firmware build in CI (`lf_test_dongle.conf`). It proves the
+      code compiles and the Kconfig is valid, not the runtime behavior.
 - There is no automated runtime test for the blinking. Behavior is verified on hardware (or
   `native_posix` if available), so each stage ends with a manual checklist.
 
@@ -190,58 +190,73 @@ Defaults: connection feedback on, 5 blinks, all peripherals required, blink inte
 
 ### Stage 0 and 1: baseline and option rename
 
-Run on `main` first and write down what you see, then again after stage 1. The results must be the
-same (the battery warning didn't repeat by default).
+Result: all steps were run with the `warning-types` branch after stage 1, not on `main`. The
+notes below are the baseline for the later stages. The `main` configs fail to build on this branch
+(the old option names no longer exist), which is expected. Stage 1 only removed the battery repeat,
+which was off by default.
 
-Config: base config.
+Config for steps 1 to 4: base config.
 
 1. Turn on A and B and wait for the boot. Reboot the dongle. The battery warning shows 5 blinks
    (red then yellow, 1 second pause), then nothing. Wait 10 minutes: no second warning.
+    - I didn't see a second warning, but i did not have my eyes on the dongle the entire 10minutes
 2. Reboot the dongle and press the layer key during the battery warning. The layer indication
    shows, then one reminder blink, then nothing.
-3. With both on and the battery warning finished, turn off B. Write down what the dongle shows and
+    - Expected results
+3. With both on and the battery warning finished, turn off B. Write down what the dongle show and
    for how long. Press the layer key during it and write down what happens. Turn B on: it stops.
+    - 2 blinking leds (without a pause between them) continously. Doesn't stop blinking.
+      the layer keys also don't stop it. Turning it back on stops it.
 4. Turn off B while the battery warning is running. Write down which warning shows first.
+    - First after the battery warning is the 2 blinking leds witout a pause between them
+5. Flash the config below and reboot the dongle: the battery warning is 3 blinks.
 
-Step 5 config (stage 1):
+    Stage 1 config:
 
-```ini
-CONFIG_ZMK_LED_FEEDBACK_LAYER=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
-CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
-```
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
+    ```
 
-Step 5 config (`main`, the option has the old name):
+- Two red LEDs for a very short time (the connection warning at boot), then 3 battery blinks.
 
-```ini
-CONFIG_ZMK_LED_FEEDBACK_LAYER=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
-CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS=3
-```
+    `main` config (the option has the old name):
 
-5. Reboot the dongle: the battery warning is 3 blinks.
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS=3
+    ```
 
-Step 6 config (stage 1):
+- Expected on this branch: build warning, the old symbol is undefined.
 
-```ini
-CONFIG_ZMK_LED_FEEDBACK_LAYER=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
-CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
-```
+6. Flash the config below. Turn off B: no connection warning. Turn B on and turn off A:
+   connection warning for A.
 
-Step 6 config (`main`, the option has the old name):
+- Expected result
 
-```ini
-CONFIG_ZMK_LED_FEEDBACK_LAYER=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
-CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS=1
-```
+    Stage 1 config:
 
-6. Turn off B: no connection warning. Turn B on and turn off A: connection warning for A.
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
+    CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
+    ```
+
+    `main` config (the option has the old name):
+
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
+    CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS=1
+    ```
+
+- Expected on this branch: build warning, the old symbol is undefined.
 
 ### Stage 2: shared engine (no new behavior)
 
@@ -252,7 +267,7 @@ Config: base config.
 
 ### Stage 3: connection warning on the engine
 
-Config (battery warning off, 3 blinks):
+Config for steps 1 to 6 (battery warning off, 3 blinks):
 
 ```ini
 CONFIG_ZMK_LED_FEEDBACK_LAYER=y
@@ -272,7 +287,7 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
 
 ### Stage 4: boot warning
 
-Config: same as stage 3.
+Config for steps 1 to 4: same as stage 3.
 
 1. Turn off B and reboot the dongle. The connection warning blinks continuously (no pauses). After
    30 seconds it stops and nothing more is shown.
@@ -281,22 +296,19 @@ Config: same as stage 3.
    connects.
 4. Turn off B, reboot and press the layer key after 10 seconds: the layer indication shows, then
    the continuous blinking resumes without a reminder blink, and stops at 30 seconds after boot.
+5. Flash the config below (connection feedback off), reboot with B off: nothing blinks.
 
-Step 5 config (connection feedback off):
-
-```ini
-CONFIG_ZMK_LED_FEEDBACK_LAYER=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
-CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
-CONFIG_ZMK_LED_FEEDBACK_CONNECTION=n
-```
-
-5. Reboot with B off: nothing blinks.
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
+    CONFIG_ZMK_LED_FEEDBACK_CONNECTION=n
+    ```
 
 ### Stage 5: battery on required, connected peripherals
 
-Steps 1 and 3 config:
+Config for steps 1 and 2:
 
 ```ini
 CONFIG_ZMK_LED_FEEDBACK_LAYER=y
@@ -307,27 +319,25 @@ CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
 ```
 
 1. A low, A and B connected: one low battery warning shows.
-3. With A low and connected, turn off A: the low battery warning stops right away and the
+2. With A low and connected, turn off A: the low battery warning stops right away and the
    connection warning for A shows. Turn A on: the low battery warning shows again.
+3. Flash the config below (replace `70` with a value between the battery levels of A and B, so only
+   B is low). Only B is low and B is not required: no warning.
 
-Step 2 config (replace `70` with a value between the battery levels of A and B, so only B is low):
-
-```ini
-CONFIG_ZMK_LED_FEEDBACK_LAYER=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=70
-CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
-CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
-```
-
-2. Only B is low (B is not required): no warning.
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=70
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
+    CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
+    ```
 
 ### Stage 6: no reading warning
 
 You need a peripheral that doesn't report a battery level (the battery key shows the "no reading"
 color). Use a peripheral without battery reporting for this.
 
-Config:
+Config for steps 1 to 3:
 
 ```ini
 CONFIG_ZMK_LED_FEEDBACK_LAYER=y
@@ -346,7 +356,7 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
 
 5 is the minimum inactivity value, use it in a local build only.
 
-Config:
+Config for steps 1 to 5:
 
 ```ini
 CONFIG_ZMK_LED_FEEDBACK_LAYER=y
@@ -363,37 +373,33 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
 4. Press a key within 5 minutes after any warning: no new warning (no new period).
 5. Repeat 1 and 2 with A low and its warning finished: the first key press gives the boot warning
    (if B is off), then a new low battery warning.
+6. Flash the config below (long warning). Turn off B and wait for the boot warning to end. Press
+   no keys for 5 minutes, then press one while the warning is still blinking. The running warning
+   stops and a new period starts.
 
-Step 6 config (long warning):
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=100
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
+    ```
 
-```ini
-CONFIG_ZMK_LED_FEEDBACK_LAYER=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
-CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=100
-CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
-```
+7. Flash the config below (inactivity reset off). Repeat 1 and 2, then press a key: nothing shows.
 
-6. Turn off B and wait for the boot warning to end. Press no keys for 5 minutes, then press one
-   while the warning is still blinking. The running warning stops and a new period starts.
-
-Step 7 config (inactivity reset off):
-
-```ini
-CONFIG_ZMK_LED_FEEDBACK_LAYER=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
-CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
-CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=0
-```
-
-7. Repeat 1 and 2, then press a key: nothing shows.
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=0
+    ```
 
 ### Stage 8: final pass
 
 Config: base config (all defaults: 5 blinks, no inactivity reset). Repeat the checks of stages 3
-to 5, which need their own configs but with the `WARNING_BLINKS` line removed. Check the defaults:
-5 blinks, about 10 seconds per warning, no inactivity reset.
+to 5, using their configs with the `WARNING_BLINKS` line removed. Check the defaults: 5 blinks,
+about 10 seconds per warning, no inactivity reset.
 
 ## Risks
 
