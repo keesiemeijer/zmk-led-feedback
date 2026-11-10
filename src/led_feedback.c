@@ -18,9 +18,12 @@
 #include <zmk/event_manager.h>
 #include <zmk/events/battery_state_changed.h>
 #include <zmk/events/layer_state_changed.h>
+#include <zmk/events/position_state_changed.h>
 #include <zmk/keymap.h>
 
 #include <zmk_led_feedback.h>
+
+#include "warning_activity.h"
 
 // The warning types that are enabled. The warning engine only exists when at least one is.
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION)
@@ -38,9 +41,7 @@
 #if WARN_CONNECTION || WARN_BATTERY
 // Asks the warning engine to check the warning conditions and start a warning if one is due.
 static void warning_request_check(void);
-#if WARN_BATTERY
 static void warning_schedule_boot_check(void);
-#endif
 // Dismisses the running warning for a layer indication.
 static void warning_layer_interrupt(void);
 // Stops the running warning, for a battery level display.
@@ -487,9 +488,7 @@ BT_CONN_CB_DEFINE(led_feedback_conn_cb) = {
 
 static int led_feedback_init(void) {
     warning_request_check();
-#if WARN_BATTERY
     warning_schedule_boot_check();
-#endif
     return 0;
 }
 
@@ -672,12 +671,15 @@ static bool warning_reminder[WARNING_NONE];
 
 #define BOOT_WARNING_MS 30000
 
-// The connection warning starts with a boot phase: it blinks without pauses until every required
-// peripheral is connected or BOOT_WARNING_MS passed since boot. It has no reminder blink.
+// The connection warning starts with a boot phase. A reset starts a new 30-second phase.
 static bool boot_phase = WARN_CONNECTION;
+static int64_t boot_deadline = BOOT_WARNING_MS;
+#if WARN_BATTERY
+static bool battery_boot_delay_done;
+#endif
 
 static bool boot_expired(void) {
-    return k_uptime_get() >= BOOT_WARNING_MS;
+    return k_uptime_get() >= boot_deadline;
 }
 
 static bool warning_continuous(enum warning_type type) {
@@ -686,11 +688,11 @@ static bool warning_continuous(enum warning_type type) {
 
 static void warning_handler(struct k_work *work);
 static void warning_check_handler(struct k_work *work);
+static bool warning_strip_free(void);
 
 static K_WORK_DELAYABLE_DEFINE(warning_work, warning_handler);
 static K_WORK_DELAYABLE_DEFINE(warning_check_work, warning_check_handler);
 
-#if WARN_BATTERY
 static void warning_boot_check_handler(struct k_work *work) {
     warning_request_check();
 }
@@ -698,9 +700,63 @@ static void warning_boot_check_handler(struct k_work *work) {
 static K_WORK_DELAYABLE_DEFINE(warning_boot_check_work, warning_boot_check_handler);
 
 static void warning_schedule_boot_check(void) {
-    int64_t remaining = MAX(0, BOOT_WARNING_MS - k_uptime_get());
-    k_work_schedule(&warning_boot_check_work, K_MSEC(remaining));
+    int64_t remaining = MAX(0, boot_deadline - k_uptime_get());
+    k_work_reschedule(&warning_boot_check_work, K_MSEC(remaining));
 }
+
+#if CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES > 0
+#define INACTIVITY_MS ((int64_t)CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES * 60 * 1000)
+
+static struct k_spinlock activity_lock;
+static struct warning_activity key_activity;
+static int64_t reset_timestamp;
+
+static void warning_reset_handler(struct k_work *work) {
+    k_spinlock_key_t key = k_spin_lock(&activity_lock);
+    int64_t timestamp = reset_timestamp;
+    k_spin_unlock(&activity_lock, key);
+
+    k_work_cancel_delayable(&warning_work);
+    warning_active = WARNING_NONE;
+    memset(warning_warned, 0, sizeof(warning_warned));
+    memset(warning_reminder, 0, sizeof(warning_reminder));
+    boot_deadline = timestamp + BOOT_WARNING_MS;
+    boot_phase = WARN_CONNECTION;
+#if WARN_BATTERY
+    battery_boot_delay_done = true;
+#endif
+    warning_schedule_boot_check();
+
+    if (device_is_ready(strip) && warning_strip_free()) {
+        feedback_idle();
+    } else {
+        warning_request_check();
+    }
+}
+
+static K_WORK_DELAYABLE_DEFINE(warning_reset_work, warning_reset_handler);
+
+static int warning_activity_listener(const zmk_event_t *eh) {
+    const struct zmk_position_state_changed *event = as_zmk_position_state_changed(eh);
+    if (!event || !event->state) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    k_spinlock_key_t key = k_spin_lock(&activity_lock);
+    bool reset = warning_activity_press(&key_activity, event->timestamp, INACTIVITY_MS);
+    if (reset) {
+        reset_timestamp = event->timestamp;
+    }
+    k_spin_unlock(&activity_lock, key);
+
+    if (reset) {
+        k_work_reschedule(&warning_reset_work, K_NO_WAIT);
+    }
+    return ZMK_EV_EVENT_BUBBLE;
+}
+
+ZMK_LISTENER(led_feedback_activity, warning_activity_listener);
+ZMK_SUBSCRIPTION(led_feedback_activity, zmk_position_state_changed);
 #endif
 
 // True while the condition for the type holds.
@@ -712,7 +768,8 @@ static bool warning_condition(enum warning_type type) {
 #endif
 #if WARN_BATTERY
     case WARNING_BATTERY_NO_READING:
-        return boot_expired() && any_battery_missing();
+        return (battery_boot_delay_done || k_uptime_get() >= BOOT_WARNING_MS) &&
+               any_battery_missing();
     case WARNING_BATTERY:
         return any_battery_low();
 #endif

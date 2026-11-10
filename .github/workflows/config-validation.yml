@@ -18,3 +18,9 @@ jobs:
         run: cmake -S tests/config-validation -B build/config-validation
       - name: Run tests
         run: ctest --test-dir build/config-validation --output-on-failure
+      - name: Configure and build inactivity tests
+        run: |
+          cmake -S tests/warning-activity -B build/warning-activity
+          cmake --build build/warning-activity
+      - name: Run inactivity tests
+        run: ctest --test-dir build/warning-activity --output-on-failure

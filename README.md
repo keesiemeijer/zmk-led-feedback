@@ -182,8 +182,12 @@ Use them in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_COLORS`                 | `"00FF00,FFFF00,FF0000,0000FF"` | Battery colors in order: high, medium, low, no reading.              |
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL`          | `0`                             | Warn below this battery percentage; `0` disables warnings.           |
 | `CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS`         | `5`                             | Number of warning blinks (1–1000).                                   |
+| `CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES` | `0` | New warning period on the first key press after 5–1440 minutes without a key press; `0` disables it. |
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_DELAY_MS`               | `500`                           | Off time after a battery key press before the first level appears.   |
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_DURATION_MS`            | `1000`                          | How long each device's battery level stays lit.                      |
+
+The inactivity reset does nothing if connection feedback is off and the battery warning level is
+`0`. It does not show a warning merely because the inactivity period has elapsed.
 
 ### Peripheral Configuration
 

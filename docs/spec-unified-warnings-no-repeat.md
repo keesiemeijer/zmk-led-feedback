@@ -154,7 +154,10 @@ that matters: when the user comes back to the keyboard.
      only exists because readings arrive after connecting, and after a long inactivity the
      peripherals have been connected for a long time.
 - **The triggering key press** is not a layer change dismissal for the new period: the reset
-  happens first, then the warnings start.
+  happens first, then the warnings start. A layer indication caused immediately by the triggering
+  key is shown before the new warning. A delayed layer activation, such as a hold-tap deciding
+  later, follows the normal layer-change rules: it dismisses a regular warning (with a reminder)
+  or interrupts the continuous connection warning until the layer indication clears.
 - **Option.** `ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES`, default `0` (off), range 0-1440.
   Values 1 to 4 fail the build, so only `0` or 5-1440
   are valid. A very small value would make short breaks look like being away.

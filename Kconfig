@@ -138,6 +138,9 @@ config ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES
     depends on ZMK_LED_FEEDBACK_CONNECTION || ZMK_LED_FEEDBACK_BATTERY
     help
       Only 0 (off) or 5 to 1440 are valid, anything else fails the build.
+      After this much time without a key press, the next key press starts a new warning period.
+      Nothing happens when the inactivity time expires by itself. Has no effect when connection
+      feedback is off and the battery warning level is 0.
 
 config ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS
     int "Warning blink interval in milliseconds"

@@ -35,6 +35,10 @@ docker run --rm -v "$PWD/zmk-build-workspace":/workspace -v "$PWD/zmk-led-feedba
 # Config validation tests (cmake is not installed on the host)
 docker run --rm -v "$PWD/zmk-led-feedback":/module -w /module zmkfirmware/zmk-dev-arm:4.1-branch \
   bash -c 'cmake -S tests/config-validation -B /tmp/cv >/dev/null && ctest --test-dir /tmp/cv'
+
+# Inactivity timing boundary tests
+docker run --rm -v "$PWD/zmk-led-feedback":/module -w /module zmkfirmware/zmk-dev-arm:4.1-branch \
+  bash -c 'cmake -S tests/warning-activity -B /tmp/activity && cmake --build /tmp/activity && ctest --test-dir /tmp/activity'
 ```
 
 Note: `west zephyr-export` is needed first, or CMake can't find Zephyr. The workspace
@@ -425,9 +429,12 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
 
 ### Stage 7: inactivity reset
 
-5 is the minimum inactivity value, use it in a local build only.
+5 minutes is the minimum inactivity value. For steps 1 to 7, restore B's normal firmware with
+battery reporting enabled, and use an ordinary key unless a step says otherwise. Allow Bluetooth
+time to detect a powered-off peripheral. The configurations below are added to the base dongle
+configuration.
 
-Config for steps 1 to 5:
+Config for steps 1 to 4 (A's battery above 80%):
 
 ```ini
 CONFIG_ZMK_LED_FEEDBACK_LAYER=y
@@ -442,17 +449,29 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
 3. Press a key: the continuous boot warning shows (up to 30 seconds) because B is still off. Turn
    B on: it stops.
 4. Press a key within 5 minutes after any warning: no new warning (no new period).
-5. Repeat 1 and 2 with A low and its warning finished: the first key press gives the boot warning
-   (if B is off), then a new low battery warning.
-6. Flash the config below (long warning). Turn off B and wait for the boot warning to end. Press
-   no keys for 5 minutes, then press one while the warning is still blinking. The running warning
-   stops and a new period starts.
+5. Flash the config below, with A's battery below 90%. With both peripherals on, reboot and wait
+   for the low battery warning to finish. Press a regular key, then wait 5 minutes without pressing
+   any key. Nothing blinks during that time. Press a regular key: the low battery warning shows
+   again. Press another key within 5 minutes: no new warning.
+
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=90
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
+    ```
+
+6. Flash the config below (long warning). Turn on both peripherals and wait for boot. Press a
+   regular key, then turn off B. After the connection warning starts, press no keys for 5 minutes,
+   then press a regular key while the warning is still blinking. The running warning stops and a
+   new period starts with the continuous boot warning.
 
     ```ini
     CONFIG_ZMK_LED_FEEDBACK_LAYER=y
     CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
     CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
-    CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=100
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=200
     CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
     ```
 
@@ -464,6 +483,38 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
     CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
     CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
     CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=0
+    ```
+
+8. Flash the config below. With B off and its warning finished, wait 5 minutes without pressing a
+   key. Press a layer key: the layer indication shows first, followed by the continuous connection
+   warning for the remainder of the 30 seconds. A later layer change interrupts the warning
+   normally. A hold-tap layer key that activates its layer later can interrupt the new warning; it
+   then resumes.
+
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=80
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
+    ```
+
+9. Keep the step 8 dongle config and disable B's battery service as in stage 6. With both
+   peripherals connected, wait for the yellow warning to finish. Press a regular key, then wait
+   5 minutes without pressing any key. Press a regular key: the yellow warning starts without a
+   further 30-second delay. Restore B's normal firmware after the test.
+10. Flash the config below, with A below 90% and both peripherals reporting battery levels. Reboot
+    and let the low-battery warning finish. Press a regular key, then wait 5 minutes. Press and
+    hold an immediate layer key: the layer indication appears, then the full 3-blink low-battery
+    warning. Repeat the test using a hold-tap layer key: if its layer activates after the warning
+    starts, the indication interrupts the warning and a single reminder blink follows.
+
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=90
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
     ```
 
 ### Stage 8: final pass
