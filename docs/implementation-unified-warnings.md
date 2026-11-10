@@ -281,24 +281,33 @@ Known interim differences (the connection warning is still continuous until stag
 Config for steps 1 to 6 (battery warning off, 3 blinks):
 
 ```ini
-CONFIG_ZMK_LED_FEEDBACK_LAYER=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
-CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
-CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
+795
 ```
 
 1. Turn on A and B and wait for the boot. Turn off B.
 2. The connection warning shows 3 blinks with 1 second pauses, then stops. Wait 2 minutes: nothing
    more is shown while B is off.
+    - Expected restults
 3. Turn B on, wait for it to connect, turn it off again: a new 3 blink warning.
+   -Expected results
 4. During a warning press the layer key: the layer indication shows, then one reminder blink, then
    nothing.
+    - expected results
 5. After a warning has finished press the layer key: no reminder blink.
+    - expected results
 6. Turn off B, and turn it on again after the first blink: the warning stops right away.
+    - expected reslults
 
 ### Stage 4: boot warning
 
-Config for steps 1 to 4: same as stage 3.
+Config for steps 1 to 4:
+
+```ini
+CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
+```
 
 1. Turn off B and reboot the dongle. The connection warning blinks continuously (no pauses). After
    30 seconds it stops and nothing more is shown.

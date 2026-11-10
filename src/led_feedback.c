@@ -639,6 +639,20 @@ static int warning_step_limit;
 static bool warning_warned[WARNING_NONE];
 static bool warning_reminder[WARNING_NONE];
 
+#define BOOT_WARNING_MS 30000
+
+// The connection warning starts with a boot phase: it blinks without pauses until every required
+// peripheral is connected or BOOT_WARNING_MS passed since boot. It has no reminder blink.
+static bool boot_phase = WARN_CONNECTION;
+
+static bool boot_expired(void) {
+    return k_uptime_get() >= BOOT_WARNING_MS;
+}
+
+static bool warning_continuous(enum warning_type type) {
+    return type == WARNING_CONNECTION && boot_phase;
+}
+
 static void warning_handler(struct k_work *work);
 static void warning_check_handler(struct k_work *work);
 
@@ -671,7 +685,7 @@ static int warning_draw(enum warning_type type, int step) {
 
 #if WARN_CONNECTION
     if (type == WARNING_CONNECTION) {
-        int phase = step % 3;
+        int phase = warning_continuous(type) ? step % 2 * 2 : step % 3;
 
         if (phase == 0) {
             int missing = connection_missing();
@@ -690,7 +704,7 @@ static int warning_draw(enum warning_type type, int step) {
             update_strip(0, (struct led_rgb){0}, source);
         }
 
-        return phase == 2 ? WARNING_PAUSE_MS : WARNING_STEP_MS;
+        return phase == 2 && !warning_continuous(type) ? WARNING_PAUSE_MS : WARNING_STEP_MS;
     }
 #endif
 
@@ -708,7 +722,13 @@ static int warning_draw(enum warning_type type, int step) {
 
 // Runs the steps of the warning, then brings back the normal display.
 static void warning_handler(struct k_work *work) {
-    if (warning_step >= warning_step_limit) {
+    if (warning_continuous(warning_active) && boot_expired()) {
+        // Counts as a warning that was shown. The check below ends the boot phase.
+        warning_request_check();
+        return;
+    }
+
+    if (!warning_continuous(warning_active) && warning_step >= warning_step_limit) {
         warning_active = WARNING_NONE;
         feedback_idle();
         return;
@@ -750,6 +770,25 @@ static void warning_check_handler(struct k_work *work) {
         return;
     }
 
+#if WARN_CONNECTION
+    if (boot_phase) {
+        bool missing = warning_condition(WARNING_CONNECTION);
+
+        if (!missing || boot_expired()) {
+            boot_phase = false;
+            // Still missing after the boot phase: it counts as a warning that was shown.
+            warning_warned[WARNING_CONNECTION] = missing;
+
+            if (warning_active == WARNING_CONNECTION) {
+                warning_active = WARNING_NONE;
+                k_work_cancel_delayable(&warning_work);
+                feedback_idle();
+                return;
+            }
+        }
+    }
+#endif
+
     for (int type = 0; type < WARNING_NONE; type++) {
         if (warning_condition(type)) {
             continue;
@@ -776,6 +815,11 @@ static void warning_check_handler(struct k_work *work) {
             continue;
         }
 
+        if (warning_continuous(type)) {
+            warning_start(type, 0);
+            return;
+        }
+
         if (warning_reminder[type]) {
             warning_reminder[type] = false;
             warning_start(type, 1);
@@ -798,13 +842,14 @@ static void warning_request_check(void) {
     k_work_reschedule(&warning_check_work, K_NO_WAIT);
 }
 
-// A layer indication dismisses the warning. After it the warning gets one reminder blink.
+// A layer indication dismisses the warning. After it the warning gets one reminder blink, except
+// for the boot warning that just resumes.
 static void __maybe_unused warning_layer_interrupt(void) {
     if (warning_active == WARNING_NONE) {
         return;
     }
 
-    warning_reminder[warning_active] = true;
+    warning_reminder[warning_active] = !warning_continuous(warning_active);
     warning_active = WARNING_NONE;
     k_work_cancel_delayable(&warning_work);
 }
