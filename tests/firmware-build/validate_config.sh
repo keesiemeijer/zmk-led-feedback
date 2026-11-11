@@ -49,10 +49,21 @@ run_case defaults success configure ""
 grep -qx '# CONFIG_ZMK_LED_FEEDBACK_CONNECTION is not set' "$VALIDATION_BUILD_ROOT/defaults/zephyr/.config"
 grep -qx '# CONFIG_ZMK_LED_FEEDBACK_BATTERY is not set' "$VALIDATION_BUILD_ROOT/defaults/zephyr/.config"
 run_case connection_only success configure "" -DCONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+grep -qx 'CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y' "$VALIDATION_BUILD_ROOT/connection_only/zephyr/.config"
+grep -qx '# CONFIG_ZMK_LED_FEEDBACK_BATTERY is not set' "$VALIDATION_BUILD_ROOT/connection_only/zephyr/.config"
+run_case battery_monitoring_only success configure "" -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+grep -qx '# CONFIG_ZMK_LED_FEEDBACK_CONNECTION is not set' "$VALIDATION_BUILD_ROOT/battery_monitoring_only/zephyr/.config"
+grep -qx 'CONFIG_ZMK_LED_FEEDBACK_BATTERY=y' "$VALIDATION_BUILD_ROOT/battery_monitoring_only/zephyr/.config"
+grep -qx 'CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0' "$VALIDATION_BUILD_ROOT/battery_monitoring_only/zephyr/.config"
 run_case battery_only success configure "" -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15 -DCONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
 grep -qx '# CONFIG_ZMK_LED_FEEDBACK_CONNECTION is not set' "$VALIDATION_BUILD_ROOT/battery_only/zephyr/.config"
+grep -qx 'CONFIG_ZMK_LED_FEEDBACK_BATTERY=y' "$VALIDATION_BUILD_ROOT/battery_only/zephyr/.config"
+grep -qx 'CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15' "$VALIDATION_BUILD_ROOT/battery_only/zephyr/.config"
 grep -qx 'CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1' "$VALIDATION_BUILD_ROOT/battery_only/zephyr/.config"
 run_case both_warnings success configure "" -DCONFIG_ZMK_LED_FEEDBACK_CONNECTION=y -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
+grep -qx 'CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y' "$VALIDATION_BUILD_ROOT/both_warnings/zephyr/.config"
+grep -qx 'CONFIG_ZMK_LED_FEEDBACK_BATTERY=y' "$VALIDATION_BUILD_ROOT/both_warnings/zephyr/.config"
+grep -qx 'CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15' "$VALIDATION_BUILD_ROOT/both_warnings/zephyr/.config"
 run_case threshold_min success configure "" -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=2
 run_case threshold_max success configure "" -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=100
 grep -qx 'CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=2' "$VALIDATION_BUILD_ROOT/threshold_min/zephyr/.config"
@@ -73,11 +84,17 @@ grep -qx 'CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS=10' "$VALIDATION_BUILD_
 run_case blink_count_low failure configure 'must be from 1 to 10' -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS=0
 run_case blink_count_high failure configure 'must be from 1 to 10' -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS=11
 run_case required_zero success configure "" -DCONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=0
+grep -qx 'CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=0' "$VALIDATION_BUILD_ROOT/required_zero/zephyr/.config"
+run_case required_some success configure "" -DCONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
+grep -qx 'CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1' "$VALIDATION_BUILD_ROOT/required_some/zephyr/.config"
 run_case required_all success configure "" -DCONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=2
+grep -qx 'CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=2' "$VALIDATION_BUILD_ROOT/required_all/zephyr/.config"
 run_case required_too_many failure configure 'must not exceed' -DCONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=3
 run_case required_negative failure configure 'must be from -1 to 16' -DCONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-2
 run_case mapping_valid success configure "" '-DCONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="2,1"'
 grep -qx 'CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="2,1"' "$VALIDATION_BUILD_ROOT/mapping_valid/zephyr/.config"
+run_case mapping_identity success configure "" '-DCONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="1,2"'
+grep -qx 'CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="1,2"' "$VALIDATION_BUILD_ROOT/mapping_identity/zephyr/.config"
 run_case mapping_duplicate failure configure 'must be a permutation' '-DCONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="1,1"'
 run_case mapping_short failure configure 'must have exactly 2 entries' '-DCONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="1"'
 run_case mapping_zero failure configure 'must be a comma separated permutation' '-DCONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="0"'

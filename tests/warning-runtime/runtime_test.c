@@ -83,15 +83,16 @@ static int test_priority_and_restore(void) {
     fake_layer = 1;
     layer_listener(NULL);
     zmk_led_feedback_show_battery(1);
+    zmk_led_feedback_change_brightness(1);
     CHECK(run_until(0) == 0);
-    CHECK(pixels_match(64, 0, 0, 2));
+    CHECK(pixels_match(80, 0, 0, 2));
     CHECK(!battery_work.pending);
     zmk_led_feedback_set_layer_always_on(1);
     connect_slot(1);
     CHECK(run_until(0) == 0);
-    CHECK(pixels_match(64, 0, 0, 4));
+    CHECK(pixels_match(80, 0, 0, 4));
     CHECK(run_until(9000) == 0);
-    CHECK(pixels_match(0, 64, 0, 2));
+    CHECK(pixels_match(0, 80, 0, 2));
     CHECK(!warning_rendered);
     return 0;
 }
@@ -112,6 +113,52 @@ static int test_display_controls(void) {
     CHECK(warning_state.battery_status == LF_WARNING_BATTERY_DONE);
     CHECK(run_until(1000) == 0);
     CHECK(pixels_match(0, 0, 0, 0));
+    return 0;
+}
+
+static int test_controls_during_battery_warning(void) {
+    CHECK(led_feedback_init() == 0);
+    connect_slot(0);
+    connect_slot(1);
+    report_battery(0, 10);
+    CHECK(run_until(0) == 0);
+    CHECK(pixels_match(64, 0, 0, 4));
+
+    fake_layer = 3;
+    layer_listener(NULL);
+    zmk_led_feedback_show_battery(1);
+    zmk_led_feedback_set_layer_always_on(1);
+    zmk_led_feedback_change_brightness(1);
+    CHECK(run_until(0) == 0);
+    CHECK(pixels_match(80, 0, 0, 4));
+    CHECK(warning_state.battery_status == LF_WARNING_BATTERY_ACTIVE);
+    CHECK(!battery_work.pending);
+    CHECK(!layer_show_work.pending);
+
+    CHECK(run_until(9000) == 0);
+    CHECK(warning_state.battery_status == LF_WARNING_BATTERY_DONE);
+        CHECK(pixels_match(0, 0, 80, 4));
+    return 0;
+}
+
+static int test_brightness_stops_at_bounds(void) {
+    CHECK(led_feedback_init() == 0);
+    connect_slot(0);
+    connect_slot(1);
+    CHECK(run_until(0) == 0);
+    for (int step = 0; step < 10; step++) {
+        zmk_led_feedback_change_brightness(1);
+    }
+    CHECK(brightness == CONFIG_ZMK_LED_FEEDBACK_MAX_BRIGHTNESS);
+    CHECK(run_until(0) == 0);
+    CHECK(pixels_match(0, 128, 0, 4));
+
+    for (int step = 0; step < 10; step++) {
+        zmk_led_feedback_change_brightness(-1);
+    }
+    CHECK(brightness == CONFIG_ZMK_LED_FEEDBACK_MIN_BRIGHTNESS);
+    CHECK(run_until(0) == 0);
+    CHECK(pixels_match(0, 10, 0, 4));
     return 0;
 }
 
@@ -281,6 +328,8 @@ int main(int argc, char **argv) {
     static const struct runtime_case cases[] = {
         {"priority_and_restore", test_priority_and_restore},
         {"display_controls", test_display_controls},
+        {"controls_during_battery_warning", test_controls_during_battery_warning},
+        {"brightness_stops_at_bounds", test_brightness_stops_at_bounds},
         {"early_connection", test_early_connection},
         {"battery_only_feedback", test_battery_only_feedback},
         {"interrupted_battery_display", test_interrupted_battery_display},

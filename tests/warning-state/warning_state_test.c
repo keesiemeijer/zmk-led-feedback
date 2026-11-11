@@ -361,6 +361,62 @@ static int test_battery_restart_unresolved(void) {
     return 0;
 }
 
+static int test_repeated_battery_interruptions(void) {
+    struct lf_warning_config config = test_config(true, 20);
+    struct lf_warning_state state;
+    lf_warning_init(&state, &config, 0);
+    lf_warning_connection_event(&state, 0, 0, true);
+    lf_warning_connection_event(&state, 0, 1, true);
+    lf_warning_battery_event(&state, 100, 0, 10);
+    lf_warning_advance(&state, 600);
+    CHECK_OUTPUT(state, LF_WARNING_OUTPUT_BATTERY, 4, 0xFFFF00);
+
+    lf_warning_connection_event(&state, 700, 1, false);
+    CHECK_OUTPUT(state, LF_WARNING_OUTPUT_CONNECTION, 2, 0xFF0000);
+    lf_warning_connection_event(&state, 800, 1, true);
+    CHECK_OUTPUT(state, LF_WARNING_OUTPUT_BATTERY, 4, 0xFF0000);
+    CHECK(state.battery_blinks_completed == 0);
+
+    lf_warning_advance(&state, 1300);
+    CHECK_OUTPUT(state, LF_WARNING_OUTPUT_BATTERY, 4, 0xFFFF00);
+    lf_warning_connection_event(&state, 1400, 1, false);
+    CHECK_OUTPUT(state, LF_WARNING_OUTPUT_CONNECTION, 2, 0xFF0000);
+    lf_warning_connection_event(&state, 1500, 1, true);
+    CHECK_OUTPUT(state, LF_WARNING_OUTPUT_BATTERY, 4, 0xFF0000);
+    CHECK(state.battery_blinks_completed == 0);
+
+    CHECK(advance_until(&state, 10499) == 0);
+    CHECK(state.battery_status == LF_WARNING_BATTERY_ACTIVE);
+    CHECK(advance_until(&state, 10500) == 0);
+    CHECK(state.battery_status == LF_WARNING_BATTERY_DONE);
+    lf_warning_battery_event(&state, 10501, 1, 5);
+    CHECK_OUTPUT(state, LF_WARNING_OUTPUT_NONE, 0, 0);
+    return 0;
+}
+
+static int test_battery_latch_healthy_and_zero(void) {
+    struct lf_warning_config config = test_config(true, 20);
+    struct lf_warning_state state;
+    lf_warning_init(&state, &config, 0);
+    lf_warning_connection_event(&state, 0, 0, true);
+    lf_warning_battery_event(&state, 100, 0, 10);
+    CHECK(state.battery_status == LF_WARNING_BATTERY_PENDING);
+    lf_warning_battery_event(&state, 200, 0, 80);
+    lf_warning_battery_event(&state, 300, 0, 0);
+    CHECK(state.battery_status == LF_WARNING_BATTERY_PENDING);
+    CHECK(state.battery_levels[0] == 0);
+    lf_warning_connection_event(&state, 400, 1, true);
+    CHECK(state.battery_status == LF_WARNING_BATTERY_ACTIVE);
+    CHECK_OUTPUT(state, LF_WARNING_OUTPUT_BATTERY, 4, 0xFF0000);
+
+    config = test_config(false, 20);
+    lf_warning_init(&state, &config, 0);
+    lf_warning_battery_event(&state, 100, 0, 0);
+    CHECK(state.battery_status == LF_WARNING_BATTERY_NONE);
+    CHECK_OUTPUT(state, LF_WARNING_OUTPUT_NONE, 0, 0);
+    return 0;
+}
+
 static int test_display_cancellation(void) {
     struct lf_warning_config config = test_config(true, 20);
     struct lf_warning_state state;
@@ -506,6 +562,8 @@ int main(int argc, char **argv) {
         {"delayed_blink_work", test_delayed_blink_work},
         {"battery_restart_resolved", test_battery_restart_resolved},
         {"battery_restart_unresolved", test_battery_restart_unresolved},
+        {"repeated_battery_interruptions", test_repeated_battery_interruptions},
+        {"battery_latch_healthy_and_zero", test_battery_latch_healthy_and_zero},
         {"display_cancellation", test_display_cancellation},
         {"display_pending", test_display_pending},
         {"display_pending_connection", test_display_pending_connection},

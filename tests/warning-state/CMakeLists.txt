@@ -26,6 +26,8 @@ foreach(case IN ITEMS
 		delayed_blink_work
 		battery_restart_resolved
 		battery_restart_unresolved
+		repeated_battery_interruptions
+		battery_latch_healthy_and_zero
 		display_cancellation
 		display_pending
 		display_pending_connection
@@ -59,7 +61,8 @@ set_target_properties(warning_runtime_test PROPERTIES C_STANDARD 99 C_STANDARD_R
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 	target_compile_options(warning_runtime_test PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-unused-function)
 endif()
-foreach(case IN ITEMS priority_and_restore display_controls early_connection battery_only_feedback
+foreach(case IN ITEMS priority_and_restore display_controls controls_during_battery_warning
+	brightness_stops_at_bounds early_connection battery_only_feedback
 	interrupted_battery_display battery_restart delayed_deadline display_off_before_init layer_hooks)
 	add_test(NAME "warning_runtime_${case}" COMMAND warning_runtime_test "${case}")
 endforeach()

@@ -20,19 +20,61 @@ jobs:
                 include:
                     - name: warnings-off
                       cmake-args: -DCONFIG_ZMK_DISPLAY=n
+                      connection: n
+                      battery: n
+                      threshold: unset
+                      required: -1
+                      layer: y
                     - name: connection-only
                       cmake-args: -DCONFIG_ZMK_DISPLAY=n -DCONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+                      connection: y
+                      battery: n
+                      threshold: unset
+                      required: -1
+                      layer: y
+                    - name: battery-monitoring-only
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
+                      connection: n
+                      battery: y
+                      threshold: 0
+                      required: -1
+                      layer: y
                     - name: battery-only
                       cmake-args: >-
                           -DCONFIG_ZMK_DISPLAY=n
                           -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
                           -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
+                          -DCONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
+                      connection: n
+                      battery: y
+                      threshold: 15
+                      required: 1
+                      layer: y
                     - name: both-warnings
                       cmake-args: >-
                           -DCONFIG_ZMK_DISPLAY=n
                           -DCONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
                           -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
                           -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
+                      connection: y
+                      battery: y
+                      threshold: 15
+                      required: -1
+                      layer: y
+                    - name: battery-only-layer-disabled
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_LAYER=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
+                      connection: n
+                      battery: y
+                      threshold: 15
+                      required: -1
+                      layer: n
         name: Build (${{ matrix.name }})
         steps:
             - uses: actions/checkout@v7.0.1
@@ -54,6 +96,27 @@ jobs:
                     -DZMK_EXTRA_MODULES="$GITHUB_WORKSPACE" \
                     -DSHIELD=lf_test_dongle \
                     ${{ matrix.cmake-args }}
+            - name: Verify effective configuration
+              working-directory: ${{ runner.temp }}/zmk-workspace
+              run: |
+                  config=build/zephyr/.config
+                  if [ "${{ matrix.connection }}" = y ]; then
+                    grep -qx 'CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y' "$config"
+                  else
+                    grep -qx '# CONFIG_ZMK_LED_FEEDBACK_CONNECTION is not set' "$config"
+                  fi
+                  if [ "${{ matrix.battery }}" = y ]; then
+                    grep -qx 'CONFIG_ZMK_LED_FEEDBACK_BATTERY=y' "$config"
+                    grep -qx 'CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=${{ matrix.threshold }}' "$config"
+                  else
+                    grep -qx '# CONFIG_ZMK_LED_FEEDBACK_BATTERY is not set' "$config"
+                  fi
+                  grep -qx 'CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=${{ matrix.required }}' "$config"
+                  if [ "${{ matrix.layer }}" = y ]; then
+                    grep -qx 'CONFIG_ZMK_LED_FEEDBACK_LAYER=y' "$config"
+                  else
+                    grep -qx '# CONFIG_ZMK_LED_FEEDBACK_LAYER is not set' "$config"
+                  fi
             - name: Validate real ZMK configuration boundaries
               if: matrix.name == 'warnings-off'
               env:
