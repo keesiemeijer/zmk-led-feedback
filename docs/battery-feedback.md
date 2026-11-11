@@ -1,23 +1,19 @@
 # Battery feedback
 
-// Todo: Remove option `CONFIG_ZMK_LED_FEEDBACK_BATTERY_DELAY_MS` from code and documentation
-
 Battery feedback displays the battery level of a peripheral on request with keycodes, and can optionally
 show a warning when a peripheral battery is low. It runs on the central. The dongle has no
 battery of its own, so only peripheral batteries are displayed.
 
 ## Configuration
 
-| Option                                                   | Default                         | Description                                                          |
-| -------------------------------------------------------- | ------------------------------- | -------------------------------------------------------------------- |
-| `CONFIG_ZMK_LED_FEEDBACK_BATTERY`                        | `n`                             | Enable the `led_bat` behavior and peripheral battery-level fetching. |
-| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_COLORS`                 | `"00FF00,FFFF00,FF0000,0000FF"` | Battery colors in order: high, medium, low, no reading.              |
-| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL`          | `0`                             | Warn below this battery percentage; `0` disables warnings.           |
-| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_REPEAT_MINUTES` | `0`                             | Repeat interval while a battery remains low; `0` disables repeats.   |
-| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS`         | `5`                             | Number of warning blinks (1–1000).                                   |
-| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_DELAY_MS`               | `500`                           | Off time after a battery key press before the first level appears.   |
-| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_DURATION_MS`            | `1000`                          | How long each device's battery level stays lit.                      |
-
+| Option                                           | Default                         | Description                                                        |
+| ------------------------------------------------ | ------------------------------- | ------------------------------------------------------------------ |
+| `CONFIG_ZMK_LED_FEEDBACK_BATTERY`                | `n`                             | Enable `led_bat` and peripheral battery-level fetching.            |
+| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_COLORS`         | `"00FF00,FFFF00,FF0000,0000FF"` | Battery colors in order: high, medium, low, no reading.            |
+| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL`  | `0`                             | Warning opt-in: `0` disables; `2-100` warns below the threshold.   |
+| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS` | `5`                             | Battery warning cycles (`1-10`), completed at most once per boot.  |
+| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_DELAY_MS`       | `500`                           | Off time after a battery key press before the first level appears. |
+| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_DURATION_MS`    | `1000`                          | How long each device's battery level stays lit.                    |
 
 ### Keycodes
 
@@ -58,7 +54,9 @@ CONFIG_ZMK_LED_FEEDBACK_BATTERY_DURATION_MS=2000
 
 The default colors are green above 60%, yellow from 20% through 60%, red below 20%, and blue if there is
 no reading. No reading means the peripheral is disconnected, has not reported yet, or does not
-report its battery.
+report its battery. A zero reading is also treated as unavailable and displays one no-reading LED.
+ZMK v0.3 does not distinguish a real 0% report from the zero value sent when a peripheral disconnects,
+so a genuine 0% reading cannot trigger a warning.
 
 Change the four colors with a comma-separated list of `RRGGBB` hex values in high, medium, low,
 no-reading order. Each value must be exactly six hex digits with no `#`; invalid values fail the
@@ -74,17 +72,19 @@ for strips with 1 to 10 LEDs.
 
 ## Low-battery warnings
 
-Set a battery warning threshold in the zmk-config [`.conf`](dongle-setup.md#dongle-configuration-file) file for the dongle.  This example triggers a battery warning when any peripheral battery drops below 15%. Set it to `0` (default) to disable warnings.
+Enable battery feedback, then set a threshold in the dongle's zmk-config [`.conf`](dongle-setup.md#dongle-configuration-file). A nonzero report below the threshold from a required peripheral during the first 20 seconds after module initialization latches one aggregate warning for that boot. Set the threshold to `0` (default) for on-demand battery display without warnings. Values `2-100` are accepted; `1` is invalid.
 
 ```ini
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
 ```
 
-The warning blinks red then yellow. At most four LEDs blink, regardless of strip length. The warnings don’t display the device number (as connection warnings do). Press the [battery display keys](#keycodes) for each device to find which one needs charging.
+The warning blinks red then yellow, using at most four LEDs. It does not identify a device; press the [battery display keys](#keycodes) to check individual peripherals. The low report remains latched if a later report is healthy or unavailable. Missing reports and zero readings do not trigger a warning.
 
-If a layer change interrupts a warning, the warning is dismissed. One red/yellow blink is shown after the layer indication clears if the battery is still low.
+At most one complete battery warning runs per boot. Connection warnings take priority. If a connection warning interrupts a partial battery sequence, the full sequence restarts when the connection warning ends, possibly after the 20-second window. A warning that continues past the deadline still completes.
 
-The shared CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS option controls the duration of each red or yellow warning color. Set an interval duration in the zmk-config [`.conf`](dongle-setup.md#dongle-configuration-file) file for the dongle.
+Layer changes, on-demand battery requests, and brightness previews do not replace or resume after a warning. Turning the display off suppresses all output and cancels an already-started battery warning without replay. See [display-off behavior](display-off.md) for pending warnings and re-enabling the display.
+
+`CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS` controls each red/yellow color phase and connection red/dark phase. The default is 500 ms; accepted values are `100-1000` ms. Set it in the dongle's zmk-config [`.conf`](dongle-setup.md#dongle-configuration-file).
 
 Example setting the blink duration to 800 milliseconds.
 
@@ -92,22 +92,11 @@ Example setting the blink duration to 800 milliseconds.
 CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS=800
 ```
 
-### Battery warning repeat
-Warnings do not repeat by default. To repeat while any battery remains low, set an interval
-in minutes in the zmk-config [`.conf`](dongle-setup.md#dongle-configuration-file) file for the dongle.
-
-Example setting the battery warning interval to 5 minutes.
-
-```ini
-CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_REPEAT_MINUTES=5
-```
-
-Repeats stop when no peripheral is below the threshold.
-
 ### Battery warning blinks
-The default battery warning is 5 warning blinks long with a short pause between them. Set a different amount in the zmk-config [`.conf`](dongle-setup.md#dongle-configuration-file) file for the dongle.
 
-Example setting the battery warnings to 10 blinks long:
+The default battery warning has five red/yellow cycles, with a one-second dark pause between cycles and no trailing pause. It takes nine seconds at the default 500 ms phase interval. Set `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS` to `1-10` in the dongle's zmk-config [`.conf`](dongle-setup.md#dongle-configuration-file).
+
+For example, set the warning to 10 cycles:
 
 ```ini
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS=10

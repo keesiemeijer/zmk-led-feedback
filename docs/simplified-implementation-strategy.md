@@ -157,13 +157,12 @@ docker run --rm --entrypoint sh \
 
 ### Stage 4 result
 
-- The firmware CI matrix now builds six profiles: warnings off, connection only, battery monitoring with threshold zero, battery-only warnings with one required peripheral, both warning types, and battery-only with layer feedback disabled. Each job checks its effective warning, threshold, required-count, and layer settings from `.config`.
+- The firmware CI matrix now builds seven profiles: warnings off, connection only, battery monitoring with threshold zero, battery-only warnings with one required peripheral, both warning types, battery-only with layer feedback disabled, and a dedicated three-slot/one-LED shield. Each job checks its effective warning, threshold, required-count, and layer settings from `.config`; the short-strip job also checks the generated devicetree chain length.
 - The real ZMK validation script now checks zero, some, and all required peripherals and both identity and reordered slot mappings. It passed 43 scenarios, including the four warning combinations and all Stage 3 boundary and rejection cases.
 - The state/runtime suite passes 36 tests. New coverage verifies that a pending low-battery report stays latched through healthy and zero reports, repeated connection interruptions restart the battery sequence without a second completed warning, warning-time controls do not take over or replay, and brightness keys stop at both configured limits. Existing cases cover zero as unavailable, one LED with three peripheral slots, hook-count clamping, no-reading display, warning priority, reconnection spillover, deadline cutoffs, and display-off cancellation.
-- All six firmware CI profiles built locally against ZMK v0.3, with the expected effective settings and UF2 outputs. The host configuration suite remains part of CI. No hardware was flashed or tested.
-- The one-LED/three-slot short-strip behavior is covered by the state-engine test. A separate devicetree firmware build using a temporary strip-length override did not complete because ZMK v0.3 failed a behavior-device-name build assertion; the ordinary fixture firmware matrix builds successfully. This variant remains unverified at the devicetree firmware level.
+- All six warning/feature firmware profiles and the dedicated short-strip profile built locally against ZMK v0.3, with expected effective settings and UF2 outputs. The short-strip build confirms three split slots alongside a one-LED strip. The state-engine test also verifies the generic warning output for this ratio. No hardware was flashed or tested.
 
-**Stage 4 result:** automated regression and firmware matrix gate met for the covered cases. The short-strip devicetree variant and all physical behavior remain unverified; hardware checks are Stage 5.
+**Stage 4 result:** automated regression and firmware matrix gate met for the covered cases. Physical behavior remains unverified; hardware checks are Stage 5.
 
 ## Stage 5: Documentation and hardware validation
 

@@ -4,7 +4,11 @@
 
 Run these checks after the relevant implementation and automated tests are complete. They are a plan, not results from tests already performed. The [simplified specification](simplified-spec.md) controls expected behavior.
 
-The configurations use the Stage 3 option names. All seven dongle profiles and the awake, sleep, and no-report peripheral configurations were built against ZMK v0.3; every explicitly requested setting matched the generated `.config`. These builds were not flashed or tested on hardware. Recheck the effective configuration for your own builds; do not silently drop an option or assume a successful build means the requested value was applied.
+The configurations use the current option names. All seven dongle profiles and the awake, sleep,
+and no-report peripheral configurations were built against ZMK v0.3; every explicitly requested
+setting matched the generated `.config`. These builds were not flashed or tested on hardware.
+Recheck the effective configuration for your own builds; do not silently drop an option or assume
+a successful build means the requested value was applied.
 
 ## Hardware and preparation
 
@@ -364,7 +368,7 @@ Flash the resulting `build/<output>/zephyr/zmk.uf2` to the corresponding device 
 
 **Expected:** no automatic connection or battery warnings, even if a required device is missing or a battery would be below the test threshold. Ordinary layer feedback, battery requests, display controls, and brightness previews work when the display is on. A missing or zero battery reading shows one no-reading LED, blue with the default battery palette. Turning the display off keeps the strip dark until a display-on or brightness control turns it back on.
 
-### 2. Connection warnings and layer priority
+### 2. Connection warning priority
 
 **Configuration:** Profile B and the complete awake peripheral configurations.
 
@@ -372,7 +376,7 @@ Flash the resulting `build/<output>/zephyr/zmk.uf2` to the corresponding device 
 2. Once device 1 has connected, use its keys to switch layers and request layer feedback while device 2 remains off. Test `LF_OFF` and, before the deadline, `LF_ON` or a brightness key.
 3. In a separate run, power device 2 on during boot. In another run, leave it off until after boot and then power it on. After a boot with both devices connected, turn device 2 off after the deadline.
 
-**Expected:** the connection warning starts while required devices are missing and updates as they connect. With only device 2 missing, two red LEDs blink. Layer changes and requests do not replace the warning, although the keyboard changes layers normally. Display off stops all LEDs; turning it on before the deadline shows any still-eligible connection warning instead of a preview. The warning stops as soon as both required devices connect or, if still missing, at the end of boot after satisfying the two-blink minimum. A new disconnection after boot produces no warning. There is no battery warning in this profile.
+**Expected:** the connection warning starts during the 20-second boot window while required devices are missing and updates as they connect. With only device 2 missing, two red LEDs blink. Layer changes and requests do not replace the warning, although the keyboard changes layers normally. Display off stops all LEDs; turning it on before the deadline shows any still-eligible connection warning instead of a preview. The warning stops as soon as both required devices connect or, if still missing, after satisfying the two-blink minimum. A disconnection processed at or after the deadline does not start or extend it. There is no battery warning in this profile.
 
 ### 3. Low battery after unresolved connection
 

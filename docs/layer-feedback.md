@@ -3,6 +3,10 @@
 Layer feedback shows the current active layer on the LED strip and can optionally stay on continuously.
 By default, it only displays the layer briefly after a layer change.
 
+Connection and battery warnings take priority over layer feedback. Layer changes still update the
+active keyboard layer, but their LED indications are not queued or replayed during a warning. When
+warnings end, the current layer is shown if continuous indication is enabled for it.
+
 ## Configuration
 
 | Option                                                     | Default           | Description                                                                                             |
@@ -10,7 +14,7 @@ By default, it only displays the layer briefly after a layer change.
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER`                            | `y`               | Enable layer feedback.                                                                                  |
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS`                     | `"00FF00,FFFF00"` | Comma-separated `RRGGBB` colors for layer groups. Each color is used until the strip fills. Default     |
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER`           | `""`              | Optional per-layer color palette. When set, overrides `LAYER_COLORS`                                    |
-| `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER_LED_COUNT` | `0`               | `0` Default. same as `COLORS_PER_LAYER`, `-1` lights all LEDs, `N` lights N LEDs.                       |
+| `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER_LED_COUNT` | `0`               | `0` cycles the LED count by layer; `-1` lights all LEDs; `1..strip length` lights that many LEDs.       |
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON`                  | `n`               | Keep showing the active layer continuously.                                                             |
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON_LAYERS`           | `""`              | Comma-separated layer numbers (for example `"2,7"`) to keep showing even when `LAYER_ALWAYS_ON` is off. |
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER_DURATION_MS`                | `1000`            | How long to show the layer after a layer change.                                                        |
@@ -23,8 +27,6 @@ There are two keycodes to briefly display the current layer and to toggle the co
 | -------------- | ---------------------------------- |
 | `LF_LAYER`     | Show the current layer briefly.    |
 | `LF_LAYER_TOG` | Toggle continuous layer indication |
-
-// Todo: what happens when led feedback is toggled off
 
 Find more information about keycodes in the [keycodes documentation](keycodes.md)
 
@@ -98,7 +100,10 @@ To set the number of leds used for layers use the `CONFIG_ZMK_LED_FEEDBACK_LAYER
 | ----- | --------------------------------------------------------------------- |
 | `0`   | Default. Same amount of a leds as [Per-layer color](#per-layer-color) |
 | `-1`  | Every layer, lights all LEDs of the LED strip                         |
-| `N`   | Every layer, lights N LEDs of the LED strip                           |
+| `N`   | Every layer lights N LEDs; N must not exceed the strip length         |
+
+The configured value is validated at build time. Counts above the strip length fail the build;
+counts returned by the runtime hook are clamped to the strip length.
 
 ```ini
 # Rainbow layer colors

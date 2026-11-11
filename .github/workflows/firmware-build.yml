@@ -75,6 +75,16 @@ jobs:
                       threshold: 15
                       required: -1
                       layer: n
+                    - name: short-strip-three-slots
+                      shield: lf_test_dongle_short_strip
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+                      connection: y
+                      battery: n
+                      threshold: unset
+                      required: -1
+                      layer: y
         name: Build (${{ matrix.name }})
         steps:
             - uses: actions/checkout@v7.0.1
@@ -94,7 +104,7 @@ jobs:
                   west build -s zmk/app -d build -b nice_nano_v2 -- \
                     -DZMK_CONFIG="$RUNNER_TEMP/zmk-workspace/config" \
                     -DZMK_EXTRA_MODULES="$GITHUB_WORKSPACE" \
-                    -DSHIELD=lf_test_dongle \
+                    -DSHIELD=${{ matrix.shield || 'lf_test_dongle' }} \
                     ${{ matrix.cmake-args }}
             - name: Verify effective configuration
               working-directory: ${{ runner.temp }}/zmk-workspace
@@ -116,6 +126,10 @@ jobs:
                     grep -qx 'CONFIG_ZMK_LED_FEEDBACK_LAYER=y' "$config"
                   else
                     grep -qx '# CONFIG_ZMK_LED_FEEDBACK_LAYER is not set' "$config"
+                  fi
+                  if [ "${{ matrix.name }}" = short-strip-three-slots ]; then
+                    grep -qx 'CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS=3' "$config"
+                    grep -Eq 'chain-length = <[[:space:]]*(0x0*1|1)[[:space:]]*>;' build/zephyr/zephyr.dts
                   fi
             - name: Validate real ZMK configuration boundaries
               if: matrix.name == 'warnings-off'

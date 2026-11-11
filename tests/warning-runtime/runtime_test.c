@@ -137,7 +137,7 @@ static int test_controls_during_battery_warning(void) {
 
     CHECK(run_until(9000) == 0);
     CHECK(warning_state.battery_status == LF_WARNING_BATTERY_DONE);
-        CHECK(pixels_match(0, 0, 80, 4));
+    CHECK(pixels_match(0, 0, 80, 4));
     return 0;
 }
 

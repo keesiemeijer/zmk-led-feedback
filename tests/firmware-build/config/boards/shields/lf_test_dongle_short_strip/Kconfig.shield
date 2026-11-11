@@ -1,0 +1,2 @@
+config SHIELD_LF_TEST_DONGLE_SHORT_STRIP
+    def_bool $(shields_list_contains,lf_test_dongle_short_strip)

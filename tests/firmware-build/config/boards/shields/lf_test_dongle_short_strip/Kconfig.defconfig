@@ -1,0 +1,15 @@
+if SHIELD_LF_TEST_DONGLE_SHORT_STRIP
+
+config ZMK_KEYBOARD_NAME
+    default "LF Short Strip"
+
+config ZMK_SPLIT
+    default y
+
+config ZMK_SPLIT_ROLE_CENTRAL
+    default y
+
+config ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS
+    default 3
+
+endif
