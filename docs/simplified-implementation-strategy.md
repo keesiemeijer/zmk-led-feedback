@@ -12,7 +12,7 @@ Each stage has a gate. Do not rely on a passing configuration-only test as proof
 
 - `tests/config-validation` is a host CMake/CTest fixture. It checks the module's CMake validation, but it does not exercise ZMK's Kconfig processing, devicetree, or warning runtime.
 - `.github/workflows/firmware-build.yml` builds a ZMK v0.3 test dongle with `tests/firmware-build/config`. Its current matrix includes display-off and override options that the new specification removes; replace those entries during the migration.
-- `tests/warning-state` now exercises the internal host-testable warning state machine with explicit monotonic times and simulated events. It does not yet test ZMK integration; that is Stage 2. The suite also runs in the configuration-validation CI workflow.
+- `tests/warning-state` exercises the internal warning state machine and, with `tests/warning-runtime`, the real runtime handler through simulated Zephyr events, work scheduling, and LED output. It does not replace a real firmware build or hardware test. The suite also runs in the configuration-validation CI workflow.
 
 ## Stage 0: Establish a baseline
 
@@ -80,7 +80,7 @@ The implementation boundary identified for the next stages is:
 - The caller must serialize state access, provide a valid full slot-to-device mapping and configured timing values, check the initialization result, and schedule the next deadline returned by the engine. A late wake processes the next phase rather than inventing LED blinks that were not displayed. Integrating these responsibilities with ZMK callbacks, strip output, display controls, and work cancellation remains Stage 2.
 - Added 21 named deterministic scenarios under `tests/warning-state`, covering independent warning options, mapped and optional peripherals, the 20-second cutoff, delayed events and work, connection priority and minimum blinks, battery sequences and restarts, post-boot state updates, and display-off cancellation. The suite passes with compiler warnings treated as errors and also passes with address and undefined-behavior sanitizers.
 - The existing 22 configuration-validation tests still pass, with the Stage 0 `CMP0174` developer warning unchanged. The state-machine source also compiles with the Zephyr SDK ARM compiler. The updated CI workflow includes the new host suite.
-- The new engine is deliberately not yet wired into firmware; the existing warning implementation and configuration remain active until Stages 2 and 3. No hardware behavior was tested.
+- At the end of Stage 1 the engine was deliberately not yet wired into firmware; runtime integration and configuration changes were deferred to Stages 2 and 3. No hardware behavior was tested in Stage 1.
 
 Run the new host suite from the module root:
 
@@ -101,6 +101,17 @@ ctest --test-dir build/warning-state --output-on-failure
 5. Keep battery and connection tracking needed for on-demand feedback up to date after boot, even though post-deadline events cannot create warnings. The required-peripheral filter must work for battery warnings even when connection warnings are disabled.
 
 **Gate:** rerun the state tests against the integrated control path or a faithful adapter, including LED phases and canceled work. Build a representative ZMK v0.3 firmware with both warnings enabled. Verify retained controls and no-warning behavior, including layer feedback, brightness, battery requests, display off/on, slot mapping, and hooks. If the existing abstractions prevent a clean replacement, stop and reassess the implementation approach.
+
+### Stage 2 result
+
+- `src/led_feedback.c` now routes connection and battery events, warning deadlines, display state, and LED warning phases through the Stage 1 engine. The former repeating, reminder, connection-blink, and battery-warning scheduling paths have been removed. Warning-state access and LED-strip writes are serialized separately; early connection state is retained before engine initialization.
+- The required-peripheral setting is available with connection warnings disabled, and the runtime uses it for both warning types. On-demand battery levels remain updated after boot. Layer changes and on-demand displays cannot interrupt warnings; display-off cancellation and brightness controls use the same warning state.
+- The host suite passes 32 deterministic cases, including tests that compile the actual runtime handler against simulated Zephyr events, work queues, LED output, and layer hooks. It also passes under address and undefined-behavior sanitizers. The existing 22 configuration-validation tests pass with the previously recorded `CMP0174` developer warning.
+- ZMK v0.3 firmware builds passed with both warning types, battery-only, connection-only, neither, and layer feedback disabled; effective settings were checked. The firmware fixture now instantiates both LED behaviors. A separate build of the actual Lily58 dongle, keymap, and layer-hook module also passed.
+- No hardware tests were performed. VS Code's local C/C++ diagnostics still report missing Zephyr include paths; the Docker firmware builds use the real Zephyr toolchain and passed.
+- Stage 3 remains necessary before treating the branch as the finished configuration: the existing Kconfig still defaults connection feedback on, legacy display-off and repeat options remain defined even though the new runtime ignores them, and strict build-time validation and the final shared option naming are not yet implemented. Until then, invalid legacy settings can cause warning initialization to fail at runtime rather than fail the build.
+
+**Stage 2 result:** runtime integration gate met for deterministic host tests and representative firmware builds. Hardware verification remains Stage 5; configuration migration and validation remain Stage 3.
 
 ## Stage 3: Configuration and validation
 

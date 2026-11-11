@@ -1,11 +1,28 @@
 #include <behaviors.dtsi>
+#include <dt-bindings/zmk/led_feedback.h>
 
 / {
+    behaviors {
+        led_fb: led_feedback {
+            compatible = "zmk,behavior-led-feedback";
+            #binding-cells = <1>;
+        };
+
+        led_bat: led_feedback_battery {
+            compatible = "zmk,behavior-led-feedback-battery";
+            #binding-cells = <1>;
+        };
+    };
+
     keymap {
         compatible = "zmk,keymap";
 
         default_layer {
-            bindings = <&none>;
+            bindings = <&led_fb LF_LAYER>;
+        };
+
+        battery_layer {
+            bindings = <&led_bat 1>;
         };
     };
 };
