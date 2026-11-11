@@ -459,8 +459,6 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
 CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
 ```
 
-dff
-
 1. Turn on A and B and wait for the boot. Turn off B and let the 3 blink warning finish.
 2. Don't press any key for 5 minutes. Nothing blinks during that time.
 3. Press a key: the continuous boot warning shows (up to 30 seconds) because B is still off. Turn
@@ -637,3 +635,59 @@ may finish before the disconnect is detected.
 - The inactivity value check (1-4 invalid) uses `BUILD_ASSERT`, like the existing numeric check.
   It is not covered by `tests/config-validation` (CMake only), so verify it once by hand with a
   firmware build using a value of 1 (must fail) and 5 (must pass).
+
+## Extra test: reading arrives during a no-reading warning
+
+This tests the remaining stage 6 case: the yellow warning stops when a reading arrives while the
+peripheral stays connected. Disabling B's battery service alone cannot produce a later reading;
+reflashing B would disconnect it. This test therefore uses a temporary **synthetic** battery event
+on the dongle. It checks the warning engine's response to the event, not Bluetooth battery
+reporting.
+
+1. Flash B with `CONFIG_BT_BAS=n`, as in stage 6. Keep A's normal battery-reporting firmware.
+   The test assumes B paired second (pairing slot 2). If it paired first, use `.source = 0`
+   instead of `.source = 1` in the temporary code below. `SLOT_ORDER` does not change the event
+   source: it is the zero-based pairing slot.
+2. Temporarily insert this code in `src/led_feedback.c` immediately after the
+   `ZMK_SUBSCRIPTION(led_feedback_battery, zmk_peripheral_battery_state_changed);` line, before
+   the following `#endif`. It sends a simulated 80% reading for B 45 seconds after initialization:
+
+    ```c
+    #include <zephyr/sys/printk.h>
+
+    static void test_battery_reading_handler(struct k_work *work) {
+        int rc = raise_zmk_peripheral_battery_state_changed(
+            (struct zmk_peripheral_battery_state_changed){.source = 1, .state_of_charge = 80});
+        if (rc < 0) {
+            printk("Test battery event failed: %d\n", rc);
+        }
+    }
+
+    static K_WORK_DELAYABLE_DEFINE(test_battery_reading_work, test_battery_reading_handler);
+
+    static int test_battery_reading_init(void) {
+        int rc = k_work_schedule(&test_battery_reading_work, K_SECONDS(45));
+        return rc < 0 ? rc : 0;
+    }
+
+    SYS_INIT(test_battery_reading_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+    ```
+
+3. Use this complete dongle config, build, and flash the temporary firmware. The low threshold
+   avoids a separate low-battery warning as long as A reports at least 15%.
+
+    ```ini
+    CONFIG_ZMK_LED_FEEDBACK_LAYER=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+    CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
+    CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=15
+    ```
+
+4. Turn on A and B, then reboot the dongle. Confirm both connect before 30 seconds; do not press a
+   layer key or request a battery display during the test.
+5. At about 30 seconds, B's yellow no-reading warning starts. At about 45 seconds, while B remains
+   connected and the warning is still blinking, the simulated reading arrives. The yellow warning
+   should stop before completing its 15 blinks and not restart while the simulated reading remains.
+   If B is not connected before the event, or the warning never starts, repeat the test.
+6. Remove the temporary code, rebuild and flash the normal dongle firmware, and restore B's normal
+   firmware with battery reporting enabled.
