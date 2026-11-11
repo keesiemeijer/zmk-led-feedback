@@ -403,7 +403,7 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
 1. With both peripherals on, the reporting peripheral above the threshold, and the other connected
    but without a reading, reboot the dongle. Once both connect, no battery warning shows in the
    first 30 seconds. At about 30 seconds 3 yellow blinks show.
-   - Passed: B was flashed with battery service disabled.
+    - Passed: B was flashed with battery service disabled.
 2. Flash the config below (with A at 87%, B connected without a reading) and reboot. The low battery
    warning shows first, then the yellow warning follows after it, once 30 seconds have passed.
 
@@ -446,15 +446,19 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS=3
 CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
 ```
 
+dff
+
 1. Turn on A and B and wait for the boot. Turn off B and let the 3 blink warning finish.
 2. Don't press any key for 5 minutes. Nothing blinks during that time.
 3. Press a key: the continuous boot warning shows (up to 30 seconds) because B is still off. Turn
    B on: it stops.
 4. Press a key within 5 minutes after any warning: no new warning (no new period).
+   Passed with expected behavior
 5. Flash the config below, with A's battery below 90%. With both peripherals on, reboot and wait
    for the low battery warning to finish. Press a regular key, then wait 5 minutes without pressing
    any key. Nothing blinks during that time. Press a regular key: the low battery warning shows
    again. Press another key within 5 minutes: no new warning.
+    - Passed with expected behavior
 
     ```ini
     CONFIG_ZMK_LED_FEEDBACK_LAYER=y
@@ -468,6 +472,7 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
    regular key, then turn off B. After the connection warning starts, press no keys for 5 minutes,
    then press a regular key while the warning is still blinking. The running warning stops and a
    new period starts with the continuous boot warning.
+    - Passed with expected behavior
 
     ```ini
     CONFIG_ZMK_LED_FEEDBACK_LAYER=y
@@ -478,6 +483,7 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
     ```
 
 7. Flash the config below (inactivity reset off). Repeat 1 and 2, then press a key: nothing shows.
+    - Passed with expected behavior
 
     ```ini
     CONFIG_ZMK_LED_FEEDBACK_LAYER=y
@@ -491,6 +497,7 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
    key. Press a layer key: the layer indication and the continuous connection warning appear.
    The layer indication may appear before the warning or interrupt it; if interrupted, the warning
    resumes for the remainder of its 30-second window. A later layer change interrupts it normally.
+    - Passed with expected behavior
 
     ```ini
     CONFIG_ZMK_LED_FEEDBACK_LAYER=y
@@ -504,11 +511,15 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
    peripherals connected, wait for the yellow warning to finish. Press a regular key, then wait
    5 minutes without pressing any key. Press a regular key: the yellow warning starts without a
    further 30-second delay. Restore B's normal firmware after the test.
+    - Passed with expected behavior
 10. Flash the config below, with A below 90% and both peripherals reporting battery levels. Reboot
     and let the low-battery warning finish. Press a regular key, then wait 5 minutes. Press and
     hold an immediate layer key. Either the layer indication appears before the full 3-blink
     low-battery warning, or it interrupts that warning and a single reminder blink follows.
     Repeat using a hold-tap layer key; the same outcomes are allowed.
+    - Layer key hold showed 1 low battery blink
+    - Layer key tap showed 1 low battery blink
+    - Hold Tap. Holding showed showed 1 low battery blink
 
     ```ini
     CONFIG_ZMK_LED_FEEDBACK_LAYER=y
