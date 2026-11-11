@@ -1,20 +1,26 @@
 name: Configuration validation
 
 on:
-  push:
-    paths-ignore:
-      - "**.md"
-  pull_request:
-    paths-ignore:
-      - "**.md"
-  workflow_dispatch:
+    push:
+        paths-ignore:
+            - "**.md"
+    pull_request:
+        paths-ignore:
+            - "**.md"
+    workflow_dispatch:
 
 jobs:
-  config-validation:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - name: Configure tests
-        run: cmake -S tests/config-validation -B build/config-validation
-      - name: Run tests
-        run: ctest --test-dir build/config-validation --output-on-failure
+    config-validation:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7.0.1
+            - name: Configure tests
+              run: cmake -S tests/config-validation -B build/config-validation
+            - name: Run tests
+              run: ctest --test-dir build/config-validation --output-on-failure
+            - name: Configure warning-state tests
+              run: cmake -S tests/warning-state -B build/warning-state
+            - name: Build warning-state tests
+              run: cmake --build build/warning-state
+            - name: Run warning-state tests
+              run: ctest --test-dir build/warning-state --output-on-failure
