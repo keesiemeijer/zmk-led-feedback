@@ -147,6 +147,8 @@ stops when a reading arrives.
   new check period: stop the running warning, drop waiting ones, clear all warned state, run the
   boot warning if a peripheral is missing, then evaluate the other conditions as new events (no
   reading right away).
+- A layer change from the triggering key can show before the new warning or interrupt it under
+  the normal layer-change rules.
 - No effect when the option is `0`.
 
 Test: firmware build. Hardware (use a temporary short value in a local build only, the minimum
@@ -486,10 +488,9 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
     ```
 
 8. Flash the config below. With B off and its warning finished, wait 5 minutes without pressing a
-   key. Press a layer key: the layer indication shows first, followed by the continuous connection
-   warning for the remainder of the 30 seconds. A later layer change interrupts the warning
-   normally. A hold-tap layer key that activates its layer later can interrupt the new warning; it
-   then resumes.
+   key. Press a layer key: the layer indication and the continuous connection warning appear.
+   The layer indication may appear before the warning or interrupt it; if interrupted, the warning
+   resumes for the remainder of its 30-second window. A later layer change interrupts it normally.
 
     ```ini
     CONFIG_ZMK_LED_FEEDBACK_LAYER=y
@@ -505,9 +506,9 @@ CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES=5
    further 30-second delay. Restore B's normal firmware after the test.
 10. Flash the config below, with A below 90% and both peripherals reporting battery levels. Reboot
     and let the low-battery warning finish. Press a regular key, then wait 5 minutes. Press and
-    hold an immediate layer key: the layer indication appears, then the full 3-blink low-battery
-    warning. Repeat the test using a hold-tap layer key: if its layer activates after the warning
-    starts, the indication interrupts the warning and a single reminder blink follows.
+    hold an immediate layer key. Either the layer indication appears before the full 3-blink
+    low-battery warning, or it interrupts that warning and a single reminder blink follows.
+    Repeat using a hold-tap layer key; the same outcomes are allowed.
 
     ```ini
     CONFIG_ZMK_LED_FEEDBACK_LAYER=y

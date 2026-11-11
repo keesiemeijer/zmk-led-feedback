@@ -143,21 +143,22 @@ that matters: when the user comes back to the keyboard.
   counts as inactivity when nobody has typed yet. The boot warning already covered that moment, and
   a reset right after it is harmless.
 - **What the new period does.** It behaves like a boot, with one difference for no reading:
-  1. The state of all warnings is reset (all "already warned" flags are cleared).
-  2. If a required peripheral is missing, the continuous
-     [boot warning](#boot-warning-connection-only) runs for up to 30 seconds. It stops as soon
-     as all required peripherals are connected (a sleeping peripheral wakes up when typing).
-  3. Then the other conditions are evaluated as new events, in the normal priority order and
-     without preemption: a low battery gives one low battery warning, a connected peripheral
-     without a reading gives one no reading warning.
-  4. The no reading condition is evaluated right away, not after 30 seconds. The delay at boot
-     only exists because readings arrive after connecting, and after a long inactivity the
-     peripherals have been connected for a long time.
-- **The triggering key press** is not a layer change dismissal for the new period: the reset
-  happens first, then the warnings start. A layer indication caused immediately by the triggering
-  key is shown before the new warning. A delayed layer activation, such as a hold-tap deciding
-  later, follows the normal layer-change rules: it dismisses a regular warning (with a reminder)
-  or interrupts the continuous connection warning until the layer indication clears.
+    1. The state of all warnings is reset (all "already warned" flags are cleared).
+    2. If a required peripheral is missing, the continuous
+       [boot warning](#boot-warning-connection-only) runs for up to 30 seconds. It stops as soon
+       as all required peripherals are connected (a sleeping peripheral wakes up when typing).
+    3. Then the other conditions are evaluated as new events, in the normal priority order and
+       without preemption: a low battery gives one low battery warning, a connected peripheral
+       without a reading gives one no reading warning.
+    4. The no reading condition is evaluated right away, not after 30 seconds. The delay at boot
+       only exists because readings arrive after connecting, and after a long inactivity the
+       peripherals have been connected for a long time.
+- **A layer change caused by the triggering key** follows the normal layer-change rules. Its
+  indication can appear before the new warning, or it can interrupt the warning after it starts.
+  If it interrupts a regular warning, one reminder blink follows; if it interrupts the continuous
+  connection warning, that warning resumes for the rest of its 30-second window. This applies to
+  immediate layer keys and delayed activations such as hold-taps. There is no guarantee which
+  order occurs; a full regular warning is not guaranteed if it is interrupted.
 - **Option.** `ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES`, default `0` (off), range 0-1440.
   Values 1 to 4 fail the build, so only `0` or 5-1440
   are valid. A very small value would make short breaks look like being away.
