@@ -10,39 +10,39 @@ mkdir -p "$VALIDATION_BUILD_ROOT"
 cd "$ZMK_WORKSPACE"
 
 run_case() {
-    case_name=$1
-    expected=$2
-    mode=$3
-    expected_message=$4
-    shift 4
-    build_dir="$VALIDATION_BUILD_ROOT/$case_name"
-    log_file="$VALIDATION_BUILD_ROOT/$case_name.log"
-    if [ -e "$build_dir" ] || [ -e "$log_file" ]; then
-        printf '%s: output already exists; choose a fresh validation directory\n' "$case_name"
-        return 1
-    fi
+	case_name=$1
+	expected=$2
+	mode=$3
+	expected_message=$4
+	shift 4
+	build_dir="$VALIDATION_BUILD_ROOT/$case_name"
+	log_file="$VALIDATION_BUILD_ROOT/$case_name.log"
+	if [ -e "$build_dir" ] || [ -e "$log_file" ]; then
+		printf '%s: output already exists; choose a fresh validation directory\n' "$case_name"
+		return 1
+	fi
 
-    cmake_only=""
-    if [ "$mode" = configure ]; then
-        cmake_only="--cmake-only"
-    fi
-    if west build $cmake_only -s "$ZMK_WORKSPACE/zmk/app" -d "$build_dir" -b nice_nano_v2 -- \
-        -DZephyr_DIR="$ZMK_WORKSPACE/zephyr/share/zephyr-package/cmake" \
-        -DZMK_CONFIG="$ZMK_CONFIG_DIR" -DZMK_EXTRA_MODULES="$MODULE_SOURCE_DIR" \
-        -DSHIELD=lf_test_dongle "$@" > "$log_file" 2>&1; then
-        if [ "$expected" = failure ]; then
-            printf '%s: unexpectedly succeeded\n' "$case_name"
-            return 1
-        fi
-        printf '%s: accepted\n' "$case_name"
-    else
-        if [ "$expected" = success ] || ! grep -Fq -- "$expected_message" "$log_file"; then
-            printf '%s: failed for an unexpected reason\n' "$case_name"
-            tail -n 50 "$log_file"
-            return 1
-        fi
-        printf '%s: rejected as expected\n' "$case_name"
-    fi
+	cmake_only=""
+	if [ "$mode" = configure ]; then
+		cmake_only="--cmake-only"
+	fi
+	if west build $cmake_only -s "$ZMK_WORKSPACE/zmk/app" -d "$build_dir" -b nice_nano_v2 -- \
+		-DZephyr_DIR="$ZMK_WORKSPACE/zephyr/share/zephyr-package/cmake" \
+		-DZMK_CONFIG="$ZMK_CONFIG_DIR" -DZMK_EXTRA_MODULES="$MODULE_SOURCE_DIR" \
+		-DSHIELD=lf_test_dongle "$@" >"$log_file" 2>&1; then
+		if [ "$expected" = failure ]; then
+			printf '%s: unexpectedly succeeded\n' "$case_name"
+			return 1
+		fi
+		printf '%s: accepted\n' "$case_name"
+	else
+		if [ "$expected" = success ] || ! grep -Fq -- "$expected_message" "$log_file"; then
+			printf '%s: failed for an unexpected reason\n' "$case_name"
+			tail -n 50 "$log_file"
+			return 1
+		fi
+		printf '%s: rejected as expected\n' "$case_name"
+	fi
 }
 
 run_case defaults success configure ""
