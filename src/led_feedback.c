@@ -640,25 +640,6 @@ ZMK_LISTENER(led_feedback_battery, battery_listener);
 // ZMK subscription for the battery listener.
 ZMK_SUBSCRIPTION(led_feedback_battery, zmk_peripheral_battery_state_changed);
 
-#include <zephyr/sys/printk.h>
-
-static void test_battery_reading_handler(struct k_work *work) {
-    int rc = raise_zmk_peripheral_battery_state_changed(
-        (struct zmk_peripheral_battery_state_changed){.source = 1, .state_of_charge = 80});
-    if (rc < 0) {
-        printk("Test battery event failed: %d\n", rc);
-    }
-}
-
-static K_WORK_DELAYABLE_DEFINE(test_battery_reading_work, test_battery_reading_handler);
-
-static int test_battery_reading_init(void) {
-    int rc = k_work_schedule(&test_battery_reading_work, K_SECONDS(45));
-    return rc < 0 ? rc : 0;
-}
-
-SYS_INIT(test_battery_reading_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
-
 #endif // IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
 
 #if WARN_CONNECTION || WARN_BATTERY
