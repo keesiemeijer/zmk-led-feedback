@@ -67,7 +67,7 @@ endforeach()
 add_executable(warning_runtime_battery_only_test ../warning-runtime/runtime_test.c ../warning-runtime/test_hooks.c ../../src/warning_state.c)
 target_include_directories(warning_runtime_battery_only_test PRIVATE ../warning-runtime "${fake_include_dir}" ../../include ../../src)
 target_compile_definitions(warning_runtime_battery_only_test PRIVATE
-	CONFIG_ZMK_LED_FEEDBACK_CONNECTION=0 CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS=1)
+	CONFIG_ZMK_LED_FEEDBACK_CONNECTION=0 CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1)
 set_target_properties(warning_runtime_battery_only_test PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 	target_compile_options(warning_runtime_battery_only_test PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-unused-function)
@@ -78,7 +78,7 @@ add_test(NAME warning_runtime_battery_only_required_filter
 add_executable(warning_runtime_mapped_test ../warning-runtime/runtime_test.c ../warning-runtime/test_hooks.c ../../src/warning_state.c)
 target_include_directories(warning_runtime_mapped_test PRIVATE ../warning-runtime "${fake_include_dir}" ../../include ../../src)
 target_compile_definitions(warning_runtime_mapped_test PRIVATE
-	CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS=1 CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="2,1")
+	CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1 CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="2,1")
 set_target_properties(warning_runtime_mapped_test PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 	target_compile_options(warning_runtime_mapped_test PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-unused-function)

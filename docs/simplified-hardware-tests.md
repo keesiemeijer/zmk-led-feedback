@@ -4,7 +4,7 @@
 
 Run these checks after the relevant implementation and automated tests are complete. They are a plan, not results from tests already performed. The [simplified specification](simplified-spec.md) controls expected behavior.
 
-The configuration names below use the current module's names as a provisional concrete plan. The simplified implementation has not chosen its final option names and may rename the shared required-peripherals setting or other options. During Stage 3, replace every affected name in every complete profile below, verify the effective `.config`, and build all profiles before using this plan. Do not silently drop an option or assume a successful build means the requested value was applied.
+The configurations use the Stage 3 option names. All seven dongle profiles and the awake, sleep, and no-report peripheral configurations were built against ZMK v0.3; every explicitly requested setting matched the generated `.config`. These builds were not flashed or tested on hardware. Recheck the effective configuration for your own builds; do not silently drop an option or assume a successful build means the requested value was applied.
 
 ## Hardware and preparation
 
@@ -111,7 +111,7 @@ CONFIG_ZMK_LED_FEEDBACK=y
 CONFIG_ZMK_LED_FEEDBACK_LAYER=y
 CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
 CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
-CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS=-1
+CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=0
 CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS=500
 CONFIG_ZMK_LED_FEEDBACK_BRIGHTNESS=64
@@ -139,7 +139,7 @@ CONFIG_ZMK_LED_FEEDBACK=y
 CONFIG_ZMK_LED_FEEDBACK_LAYER=y
 CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
 CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
-CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS=-1
+CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=100
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS=5
 CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS=500
@@ -152,7 +152,7 @@ CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="1,2"
 
 ### Profile D: battery warnings only
 
-Complete `config/keyworks_lily58_dongle.conf`. The required count is left at its default, all configured slots. After Stage 3, verify that this default applies even though connection warnings are disabled.
+Complete `config/keyworks_lily58_dongle.conf`. The required count is explicitly set to all configured slots, even though connection warnings are disabled.
 
 ```ini
 CONFIG_ZMK_SPLIT=y
@@ -168,6 +168,7 @@ CONFIG_ZMK_LED_FEEDBACK=y
 CONFIG_ZMK_LED_FEEDBACK_LAYER=y
 CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
 CONFIG_ZMK_LED_FEEDBACK_CONNECTION=n
+CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=100
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS=5
 CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS=500
@@ -196,7 +197,7 @@ CONFIG_ZMK_LED_FEEDBACK=y
 CONFIG_ZMK_LED_FEEDBACK_LAYER=y
 CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
 CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
-CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS=1
+CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=100
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS=5
 CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS=500
@@ -227,7 +228,7 @@ CONFIG_ZMK_LED_FEEDBACK=y
 CONFIG_ZMK_LED_FEEDBACK_LAYER=y
 CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
 CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
-CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS=-1
+CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=-1
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=100
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS=5
 CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS=500
@@ -258,7 +259,7 @@ CONFIG_ZMK_LED_FEEDBACK=y
 CONFIG_ZMK_LED_FEEDBACK_LAYER=y
 CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
 CONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
-CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS=1
+CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS=1
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=100
 CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS=5
 CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS=500

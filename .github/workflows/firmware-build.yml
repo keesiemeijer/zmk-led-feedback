@@ -18,15 +18,19 @@ jobs:
             fail-fast: false
             matrix:
                 include:
-                    - name: feedback-on
+                    - name: warnings-off
                       cmake-args: -DCONFIG_ZMK_DISPLAY=n
-                    - name: feedback-off-no-overrides
-                      cmake-args: -DCONFIG_ZMK_DISPLAY=n -DCONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y
-                    - name: feedback-off-all-overrides
+                    - name: connection-only
+                      cmake-args: -DCONFIG_ZMK_DISPLAY=n -DCONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
+                    - name: battery-only
                       cmake-args: >-
                           -DCONFIG_ZMK_DISPLAY=n
-                          -DCONFIG_ZMK_LED_FEEDBACK_DISPLAY_OFF=y
-                          -DCONFIG_ZMK_LED_FEEDBACK_OFF_OVERRIDES=\"layer_feedback,layer_change,battery_feedback,battery_warning,connection_warning\"
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
+                          -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
+                    - name: both-warnings
+                      cmake-args: >-
+                          -DCONFIG_ZMK_DISPLAY=n
+                          -DCONFIG_ZMK_LED_FEEDBACK_CONNECTION=y
                           -DCONFIG_ZMK_LED_FEEDBACK_BATTERY=y
                           -DCONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
         name: Build (${{ matrix.name }})
@@ -50,3 +54,11 @@ jobs:
                     -DZMK_EXTRA_MODULES="$GITHUB_WORKSPACE" \
                     -DSHIELD=lf_test_dongle \
                     ${{ matrix.cmake-args }}
+            - name: Validate real ZMK configuration boundaries
+              if: matrix.name == 'warnings-off'
+              env:
+                  ZMK_WORKSPACE: ${{ runner.temp }}/zmk-workspace
+                  MODULE_SOURCE_DIR: ${{ github.workspace }}
+                  ZMK_CONFIG_DIR: ${{ runner.temp }}/zmk-workspace/config
+                  VALIDATION_BUILD_ROOT: ${{ runner.temp }}/led-feedback-config-validation
+              run: sh "$GITHUB_WORKSPACE/tests/firmware-build/validate_config.sh"

@@ -11,7 +11,7 @@ Each stage has a gate. Do not rely on a passing configuration-only test as proof
 ## Existing test infrastructure
 
 - `tests/config-validation` is a host CMake/CTest fixture. It checks the module's CMake validation, but it does not exercise ZMK's Kconfig processing, devicetree, or warning runtime.
-- `.github/workflows/firmware-build.yml` builds a ZMK v0.3 test dongle with `tests/firmware-build/config`. Its current matrix includes display-off and override options that the new specification removes; replace those entries during the migration.
+- `.github/workflows/firmware-build.yml` builds a ZMK v0.3 test dongle with `tests/firmware-build/config` across the four warning combinations and runs real ZMK configuration validation.
 - `tests/warning-state` exercises the internal warning state machine and, with `tests/warning-runtime`, the real runtime handler through simulated Zephyr events, work scheduling, and LED output. It does not replace a real firmware build or hardware test. The suite also runs in the configuration-validation CI workflow.
 
 ## Stage 0: Establish a baseline
@@ -109,7 +109,7 @@ ctest --test-dir build/warning-state --output-on-failure
 - The host suite passes 32 deterministic cases, including tests that compile the actual runtime handler against simulated Zephyr events, work queues, LED output, and layer hooks. It also passes under address and undefined-behavior sanitizers. The existing 22 configuration-validation tests pass with the previously recorded `CMP0174` developer warning.
 - ZMK v0.3 firmware builds passed with both warning types, battery-only, connection-only, neither, and layer feedback disabled; effective settings were checked. The firmware fixture now instantiates both LED behaviors. A separate build of the actual Lily58 dongle, keymap, and layer-hook module also passed.
 - No hardware tests were performed. VS Code's local C/C++ diagnostics still report missing Zephyr include paths; the Docker firmware builds use the real Zephyr toolchain and passed.
-- Stage 3 remains necessary before treating the branch as the finished configuration: the existing Kconfig still defaults connection feedback on, legacy display-off and repeat options remain defined even though the new runtime ignores them, and strict build-time validation and the final shared option naming are not yet implemented. Until then, invalid legacy settings can cause warning initialization to fail at runtime rather than fail the build.
+- At the end of Stage 2, configuration migration and strict build-time validation remained for Stage 3. Invalid legacy settings could cause warning initialization to fail at runtime rather than fail the build.
 
 **Stage 2 result:** runtime integration gate met for deterministic host tests and representative firmware builds. Hardware verification remains Stage 5; configuration migration and validation remain Stage 3.
 
@@ -121,6 +121,30 @@ ctest --test-dir build/warning-state --output-on-failure
 4. Extend the existing configuration fixture for module CMake validation, replacing deleted override cases. Add checks in an actual ZMK/Zephyr configuration or firmware build for Kconfig and devicetree-dependent constraints, including strip length. Verify that invalid user values actually fail the build rather than being silently normalized or replaced by Kconfig.
 
 **Gate:** valid boundary values pass and invalid formats, duplicates, out-of-range values, and invalid cross-option combinations fail with the expected error. Exercise all four warning configurations: neither, connection only, battery only, and both. Run the existing host CTest suite and the targeted real ZMK configuration/build checks.
+
+### Stage 3 result
+
+- Connection warnings now default off, battery warnings remain independently opt-in, and `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS` filters both warning types. The former connection-specific required-count name and obsolete startup-off, override, and repeat options were removed without aliases.
+- Applicable values and complete slot permutations are validated at build time. Brightness ordering and configured layer LED counts are also checked, with the latter checked against the actual devicetree strip length. Runtime brightness and layer-hook results retain their bounds.
+- The host configuration suite passed 50 tests; the warning state and simulated runtime suite passed 32 tests. The real ZMK configuration suite passed 39 scenarios, including valid boundaries, rejected settings and legacy names, and actual strip-length builds. The firmware CI workflow now runs this suite and builds the four warning combinations.
+- Full ZMK v0.3 test-dongle builds passed with neither warning, connection only, battery only, and both; effective warning settings were verified. All seven complete Lily58 dongle profiles and five awake, sleep, and no-report peripheral builds also passed, with every explicitly requested profile setting checked against the generated configuration. These builds used temporary copies and did not flash hardware.
+- Physical LED behavior and timing have not been tested. The existing user-facing README and guides still need the Stage 5 documentation update.
+
+To run the real ZMK configuration suite with the same local Docker workspace:
+
+```sh
+docker run --rm --entrypoint sh \
+	-v "$HOME/github/zmk-build-workspace:/workspace:ro" \
+	-v "$PWD:/module:ro" \
+	-e ZMK_WORKSPACE=/workspace \
+	-e MODULE_SOURCE_DIR=/module \
+	-e ZMK_CONFIG_DIR=/module/tests/firmware-build/config \
+	-e VALIDATION_BUILD_ROOT=/tmp/lf-real-config-validation \
+	-w /workspace zmkfirmware/zmk-dev-arm:4.1-branch \
+	-c 'sh /module/tests/firmware-build/validate_config.sh'
+```
+
+**Stage 3 result:** configuration and validation gate met. Broader regression coverage and physical hardware verification remain in Stages 4 and 5.
 
 ## Stage 4: Firmware and regression matrix
 
@@ -138,7 +162,7 @@ ctest --test-dir build/warning-state --output-on-failure
 3. On representative hardware, follow the specification's timing-validation plan. Record module initialization, required peripheral connections, and first valid battery reports across multiple cold starts, sleeping and already-awake peripherals, staggered power-on, and reconnects. Record late or missing reports as well as successful timings.
 4. Observe the LED sequences and user controls on hardware, including a late connection warning, its minimum blinks, connection-to-battery priority, a battery-warning restart, and display-off cancellation. Test the ordinary layer and battery workflows after boot.
 
-Use the complete configurations and step-by-step procedures in [the hardware test plan](simplified-hardware-tests.md). Update its provisional option names and verify every profile builds once the implementation's configuration is finalized.
+Use the complete configurations and step-by-step procedures in [the hardware test plan](simplified-hardware-tests.md). Verify every profile builds with the effective settings before hardware testing.
 
 **Gate:** documentation matches the final implementation, automated checks remain green, and hardware observations are recorded. If hardware or a required toolchain is unavailable, state which checks remain unverified and provide the commands or procedure needed to complete them; do not report those checks as passed.
 

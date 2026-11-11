@@ -34,13 +34,12 @@ config ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER
 
 config ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER_LED_COUNT
     int "Number of LEDs lit for a layer when using per layer colors (-1 = all, 0 = cycling)"
-    range -1 255
     default 0
     depends on ZMK_LED_FEEDBACK_LAYER
     help
       Only used when ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER is set. -1 lights all LEDs, 0 lights
       one more LED for each layer (layer 0 lights 1) and starts again when the strip is full, and
-      N lights N LEDs. A number above the strip length lights all LEDs.
+            N lights N LEDs and must not exceed the strip length.
 
 config ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON
     bool "Keep showing the active layer instead of only when it changes"
@@ -58,18 +57,17 @@ config ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON_LAYERS
       is off. Other layers turn off after the layer duration. Example: "2,7".
 
 config ZMK_LED_FEEDBACK_CONNECTION
-    bool "Blink red when a split peripheral is not connected"
-    default y
+    bool "Show connection warnings during boot"
+    default n
     depends on ZMK_SPLIT
 
-config ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS
+config ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS
     int "Number of essential peripherals (-1 = all)"
-    range -1 16
     default -1
     depends on ZMK_SPLIT
     help
-      Only peripherals numbered 1 to N (see ZMK_LED_FEEDBACK_SLOT_ORDER) blink when they are not
-      connected. Higher numbered peripherals (for example a macropad) are optional and ignored.
+    Only peripherals numbered 1 to N (see ZMK_LED_FEEDBACK_SLOT_ORDER) trigger connection and
+    battery warnings. Higher numbered peripherals are optional and ignored by both warnings.
 
 config ZMK_LED_FEEDBACK_SLOT_ORDER
     string "Peripheral LED number, in pairing order"
@@ -101,31 +99,19 @@ config ZMK_LED_FEEDBACK_BATTERY_COLORS
       low battery.
 
 config ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL
-    int "Warn when a battery drops below this level in percent (0 = off)"
-    range 0 100
+    int "Warn below this battery level during boot (0 = off, 2-100 = on)"
     default 0
     depends on ZMK_LED_FEEDBACK_BATTERY
     help
-      When the battery of any peripheral drops below this level, up to 4 LEDs blink, each blink
-      red then yellow, with 1 second between the blinks. The warning doesn't say which
-      peripheral is low, check it with the battery keys. See
-      ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS and
-      ZMK_LED_FEEDBACK_BATTERY_WARNING_REPEAT_MINUTES. It starts again after no peripheral was
-      below this value any more, and then one drops below it again.
+            During boot, warn once if a required peripheral reports a nonzero battery level below this
+            threshold. Set 0 to disable or 2-100 to enable. The warning does not identify the device.
 
 config ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS
-    int "Number of times the warning blinks (1-1000)"
-    range 1 1000
+        int "Number of times the battery warning blinks (1-10)"
     default 5
     depends on ZMK_LED_FEEDBACK_BATTERY
     help
       Only used when ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL is above 0.
-
-config ZMK_LED_FEEDBACK_BATTERY_WARNING_REPEAT_MINUTES
-    int "Minutes between repeated warnings while a battery stays low (0 = don't repeat)"
-    range 0 1440
-    default 0
-    depends on ZMK_LED_FEEDBACK_BATTERY
 
 config ZMK_LED_FEEDBACK_BATTERY_DELAY_MS
     int "Time in milliseconds the LEDs stay off before the battery levels are shown"
@@ -138,7 +124,7 @@ config ZMK_LED_FEEDBACK_BATTERY_DURATION_MS
     depends on ZMK_LED_FEEDBACK_BATTERY
 
 config ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS
-    int "Warning blink interval in milliseconds"
+    int "Warning blink interval in milliseconds (100-1000)"
     default 500
     depends on ZMK_LED_FEEDBACK_CONNECTION || ZMK_LED_FEEDBACK_BATTERY
     help
@@ -147,14 +133,12 @@ config ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS
 
 config ZMK_LED_FEEDBACK_MAX_BRIGHTNESS
     int "Maximum brightness the user allows (1-255)"
-    range 1 255
     default 128
     help
       The brightness never goes above this value, also when changed with the brightness keys.
 
 config ZMK_LED_FEEDBACK_MIN_BRIGHTNESS
     int "Minimum brightness (1-255)"
-    range 1 255
     default 10
     help
       The brightness never goes below this value. Must not be higher than
@@ -162,11 +146,9 @@ config ZMK_LED_FEEDBACK_MIN_BRIGHTNESS
 
 config ZMK_LED_FEEDBACK_BRIGHTNESS
     int "Initial brightness (1-255)"
-    range 1 255
     default 64
     help
-      Limited to the range between ZMK_LED_FEEDBACK_MIN_BRIGHTNESS and
-      ZMK_LED_FEEDBACK_MAX_BRIGHTNESS.
+    Must be between ZMK_LED_FEEDBACK_MIN_BRIGHTNESS and ZMK_LED_FEEDBACK_MAX_BRIGHTNESS.
 
 config ZMK_LED_FEEDBACK_REVERSE
     bool "Fill the strip from the last LED to the first"
@@ -176,20 +158,6 @@ config ZMK_LED_FEEDBACK_REVERSE
 
 config ZMK_LED_FEEDBACK_BRIGHTNESS_STEP
     int "Brightness change for each key press"
-    range 1 255
     default 16
-
-config ZMK_LED_FEEDBACK_DISPLAY_OFF
-    bool "Start with the LED display off"
-    default n
-
-config ZMK_LED_FEEDBACK_OFF_OVERRIDES
-    string "Feedback types that can temporarily show while the display is off"
-    default ""
-    help
-      Comma separated list of feedback types that can temporarily show while the display is off:
-      layer_feedback (LF_LAYER key), layer_change (automatic layer changes), battery_feedback
-      (&led_bat key), battery_warning, and connection_warning. Example:
-      "battery_warning,connection_warning".
 
 endif

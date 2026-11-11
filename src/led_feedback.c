@@ -40,11 +40,16 @@
 // Brightness (0-255), never above the user max brightness. Changed at runtime with zmk_led_feedback_change_brightness().
 BUILD_ASSERT(CONFIG_ZMK_LED_FEEDBACK_MIN_BRIGHTNESS <= CONFIG_ZMK_LED_FEEDBACK_MAX_BRIGHTNESS,
              "CONFIG_ZMK_LED_FEEDBACK_MIN_BRIGHTNESS is higher than MAX_BRIGHTNESS");
+BUILD_ASSERT(CONFIG_ZMK_LED_FEEDBACK_BRIGHTNESS >= CONFIG_ZMK_LED_FEEDBACK_MIN_BRIGHTNESS &&
+                 CONFIG_ZMK_LED_FEEDBACK_BRIGHTNESS <= CONFIG_ZMK_LED_FEEDBACK_MAX_BRIGHTNESS,
+             "CONFIG_ZMK_LED_FEEDBACK_BRIGHTNESS must be between MIN_BRIGHTNESS and MAX_BRIGHTNESS");
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
+BUILD_ASSERT(CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER_LED_COUNT <= STRIP_LEN,
+             "CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER_LED_COUNT exceeds strip length");
+#endif
 
 // Current brightness of the LED strip. Can be changed at runtime.
-static uint8_t brightness = CLAMP(CONFIG_ZMK_LED_FEEDBACK_BRIGHTNESS,
-                                  CONFIG_ZMK_LED_FEEDBACK_MIN_BRIGHTNESS,
-                                  CONFIG_ZMK_LED_FEEDBACK_MAX_BRIGHTNESS);
+static uint8_t brightness = CONFIG_ZMK_LED_FEEDBACK_BRIGHTNESS;
 
 // Macro to scale a color channel by the current brightness.
 #define SCALE(channel) ((channel) * brightness / 255)
@@ -347,19 +352,18 @@ ZMK_SUBSCRIPTION(led_feedback_layer, zmk_layer_state_changed);
 //     Peripheral slot configuration for connection and battery feedback.
 #define PERIPHERALS CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS
 
-// Device number of a peripheral slot (the LEDs blinked while it is missing): the matching entry of the SLOT_ORDER list, or
-// slot + 1 when the entry is missing or invalid.
 static int slot_number(int slot) {
     const char *entry = CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER;
-
-    for (int i = slot; i > 0 && entry; i--) {
-        entry = strchr(entry, ',');
-        entry = entry ? entry + 1 : NULL;
+    if (!*entry) {
+        return slot + 1;
     }
 
-    long number = entry ? strtol(entry, NULL, 10) : 0;
+    for (int i = slot; i > 0; i--) {
+        entry = strchr(entry, ',');
+        entry++;
+    }
 
-    return number >= 1 && number <= PERIPHERALS ? (int)number : slot + 1;
+    return (int)strtol(entry, NULL, 10);
 }
 
 #endif
@@ -457,7 +461,7 @@ BT_CONN_CB_DEFINE(led_feedback_conn_cb) = {
 static int led_feedback_init(void) {
     struct lf_warning_config config = {
         .peripheral_count = PERIPHERALS,
-        .required_count = CONFIG_ZMK_LED_FEEDBACK_CONNECTION_REQUIRED_PERIPHERALS,
+        .required_count = CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS,
         .connection_enabled = IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_CONNECTION),
         .blink_interval_ms = CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS,
         .strip_length = STRIP_LEN,

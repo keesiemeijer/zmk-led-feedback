@@ -5,12 +5,14 @@ execute_process(
         -S "${CMAKE_CURRENT_LIST_DIR}/fixture"
         -B "${case_binary_dir}"
         "-DMODULE_SOURCE_DIR=${MODULE_SOURCE_DIR}"
-        "-DOVERRIDES=${OVERRIDES}"
         "-DLAYER=${LAYER}"
         "-DLAYER_COLORS=${LAYER_COLORS}"
         "-DPER_LAYER_COLORS=${PER_LAYER_COLORS}"
         "-DBATTERY=${BATTERY}"
         "-DBATTERY_COLORS=${BATTERY_COLORS}"
+        "-DCHECK_SETTINGS=${CHECK_SETTINGS}"
+        "-DINPUT_NAME=${INPUT_NAME}"
+        "-DINPUT_VALUE=${INPUT_VALUE}"
     RESULT_VARIABLE result
     OUTPUT_VARIABLE output
     ERROR_VARIABLE error_output
