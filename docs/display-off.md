@@ -40,8 +40,12 @@ The override list accepts these values:
 | `layer_feedback`     | The current layer when requested with the [`LF_LAYER`](keycodes.md#general-keycodes) keycode.                         |
 | `layer_change`       | Layer feedback after a ZMK [layer change keycode](https://zmk.dev/docs/keymaps/behaviors#layer-navigation-behaviors). |
 | `battery_feedback`   | Battery levels requested with the [`&led_bat N`](keycodes.md#battery-feedback-keycodes) keycode.                      |
-| `battery_warning`    | [Low-battery warnings](battery-feedback.md#low-battery-warnings) warnings.                                            |
-| `connection_warning` | [Connection warnings](connection-feedback.md#connection-warning) when required peripherals disconnect.                |
+| `battery_warning`    | [Low-battery](battery-feedback.md#low-battery-warnings) and [no-reading](battery-feedback.md#no-reading-warning) warnings. |
+| `connection_warning` | [Connection warnings](connection-feedback.md#connection-warning), including the continuous boot warning.              |
+
+Turning the display off does not pause warning conditions or inactivity periods. A suppressed
+regular warning counts as shown; turning the display back on does not replay it. See
+[warning behavior](warnings.md#display-off) for details.
 
 ## LED Feedback display keycodes
 

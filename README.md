@@ -18,10 +18,10 @@ This module can also be used on regular (split) keyboards, but it only reports o
     - Change layer colors and layer display types
     - Hooks for use in your own zmk-config repo to change module behavior
 - [Connection Status](#connection-feedback)
-    - Blinks red LEDs while a required peripheral is not connected.
+    - Warns when a required peripheral is not connected.
 - [Battery Status](#battery-feedback)
     - Shows the battery level of a peripheral (on request with a keycode).
-    - Option to show a warning if batteries go beneath a threshold.
+    - Optional warnings for low batteries and missing readings.
 - [Keycodes](docs/keycodes.md)
     - Change the features displayed on the dongle with keycodes.
 - [Connection](docs/flashing-and-pairing.md#connecting-the-dongle-to-your-computer)
@@ -29,7 +29,10 @@ This module can also be used on regular (split) keyboards, but it only reports o
 
 #### Priority
 
-The layer indication has priority over connection warnings. The warning resumes afterwards. A battery display (shown on request) temporarily takes priority over both. Layer changes stops the battery display.
+Only one warning runs at a time: connection has priority, followed by no reading and low battery.
+A visible layer indication dismisses a regular warning with one reminder blink; a continuous boot
+connection warning resumes. A requested battery display takes over the strip, and a layer change
+stops that display. See [warning behavior](docs/warnings.md) for details.
 
 ## Compatibility
 
@@ -98,7 +101,9 @@ These options are shared between this module's feedback features. Use them in yo
 | `CONFIG_ZMK_LED_FEEDBACK_MIN_BRIGHTNESS`                                             | `10`    | Minimum brightness (1-255). The brightness never goes below this, also with the brightness keys. (See [Keycodes](docs/keycodes.md))                                                     |
 | `CONFIG_ZMK_LED_FEEDBACK_MAX_BRIGHTNESS`                                             | `128`   | Maximum brightness (1-255). The brightness never goes above this, also with the brightness keys. (See [Keycodes](docs/keycodes.md))                                                     |
 | `CONFIG_ZMK_LED_FEEDBACK_BRIGHTNESS_STEP`                                            | `16`    | Brightness change for each key press.                                                                                                                                                   |
-| `CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS`                                          | `500`   | Duration of connection and battery warning blinks.                                                                                                                                      |
+| `CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS`                                          | `500`   | Duration of each step of a connection or battery warning blink.                                                                                                                         |
+| `CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS`                                             | `5`     | Number of blinks for regular warnings (1–1000).                                                                                                                                          |
+| `CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES`                                 | `0`     | New warning period on a key press after 5–1440 minutes without a key press; `0` disables it.                                                                                             |
 
 ##### Example
 
@@ -149,12 +154,12 @@ Use them in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-
 | Option                                                    | Default | Description                                                                               |
 | --------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------- |
 | `CONFIG_ZMK_LED_FEEDBACK_CONNECTION`                      | `y`     | Enable connection warnings for disconnected peripherals.                                  |
-| `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS` | `-1`    | Number of required peripherals (`-1` means all). Higher-numbered peripherals are ignored. |
+| `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS` | `-1`    | Required device numbers for connection and battery warnings (`-1` means all, `0` none). |
 
 ### Battery feedback
 
 Battery feedback can display peripheral battery levels on request and optionally warn when a
-peripheral battery is low.
+required, connected peripheral has a low battery or no reading.
 
 This feature is not enabled by default. Enable it in the `.conf` file for the central:
 
@@ -162,13 +167,15 @@ This feature is not enabled by default. Enable it in the `.conf` file for the ce
 CONFIG_ZMK_LED_FEEDBACK_BATTERY=y
 ```
 
-Find out more about connection feedback in the [battery feedback documentation](docs/battery-feedback.md).
+Find out more in the [battery feedback documentation](docs/battery-feedback.md).
 
 - [Configuration](docs/battery-feedback.md#configuration)
 - [keycodes](docs/battery-feedback.md#keycodes)
 - [Enabling battery feedback](docs/battery-feedback.md#enabling-battery-feedback)
 - [Battery display colors and scale](docs/battery-feedback.md#battery-display-colors-and-scale)
 - [Low-battery warnings](docs/battery-feedback.md#low-battery-warnings)
+- [No-reading warning](docs/battery-feedback.md#no-reading-warning)
+- [Shared warning behavior](docs/warnings.md)
 
 For percentage-to-LED mappings, see [Battery display scale](docs/battery-display-scale.md).
 
@@ -180,14 +187,13 @@ Use them in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-
 | -------------------------------------------------------- | ------------------------------- | -------------------------------------------------------------------- |
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY`                        | `n`                             | Enable the `led_bat` behavior and peripheral battery-level fetching. |
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_COLORS`                 | `"00FF00,FFFF00,FF0000,0000FF"` | Battery colors in order: high, medium, low, no reading.              |
-| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL`          | `0`                             | Warn below this battery percentage; `0` disables warnings.           |
-| `CONFIG_ZMK_LED_FEEDBACK_WARNING_BLINKS`         | `5`                             | Number of warning blinks (1–1000).                                   |
-| `CONFIG_ZMK_LED_FEEDBACK_WARNING_INACTIVITY_MINUTES` | `0` | New warning period on the first key press after 5–1440 minutes without a key press; `0` disables it. |
+| `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL`          | `0`                             | Warn below this percentage or on no reading; `0` disables battery warnings. |
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_DELAY_MS`               | `500`                           | Off time after a battery key press before the first level appears.   |
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_DURATION_MS`            | `1000`                          | How long each device's battery level stays lit.                      |
 
-The inactivity reset does nothing if connection feedback is off and the battery warning level is
-`0`. It does not show a warning merely because the inactivity period has elapsed.
+The [inactivity reset](docs/warnings.md#inactivity-reset) does nothing if connection feedback is
+off and the battery warning level is `0`. It does not show a warning merely because the inactivity
+period has elapsed.
 
 ### Peripheral Configuration
 
