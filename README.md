@@ -18,10 +18,12 @@ This module can also be used on regular (split) keyboards, but it only reports o
     - Change layer colors and layer display types
     - Hooks for use in your own zmk-config repo to change module behavior
 - [Connection Status](#connection-feedback)
-    - Optionally warns when a required peripheral is missing during the first 20 seconds after module initialization.
+    - Warns when a required peripheral is missing.
+        - Warnings are only displayed during the first 20 seconds after booting the dongle.
 - [Battery Status](#battery-feedback)
     - Shows the battery level of a peripheral (on request with a keycode).
-    - Optionally warns once per boot when a required peripheral reports a nonzero battery level below a threshold.
+    - warns when a required peripheral reports a low battery level below a threshold.
+        - Warnings are only displayed during the first 20 seconds after booting the dongle.
 - [Keycodes](docs/keycodes.md)
     - Change the features displayed on the dongle with keycodes.
 - [Connection](docs/flashing-and-pairing.md#connecting-the-dongle-to-your-computer)
@@ -29,15 +31,11 @@ This module can also be used on regular (split) keyboards, but it only reports o
 
 #### Warning behavior
 
-Connection and low-battery warnings are independent opt-ins and both default off. When enabled,
-they only detect eligible events during the 20 seconds after module initialization. Connection
-warnings take priority over battery warnings; a pending battery warning runs after the connection
-warning ends and may continue past the boot window. A connection red phase starts only when its
-full configured interval fits before the boot deadline; connection warnings never spill past boot.
-Warnings take priority over layer feedback, on-demand battery displays,
-and brightness previews. Turning the display off suppresses all output and cancels an already-
-started battery-warning sequence. See the [connection](docs/connection-feedback.md) and
-[battery](docs/battery-feedback.md#low-battery-warnings) guides for details.
+Connection and low-battery warnings are independent opt-ins and both default both to off. Warnings are only displayed during the the first 20 seconds after the dongle is connected to USB (booted). These warnings provide basic troubleshooting, but are not repeated or shown again after the boot period.
+
+A connection warning will display during the full boot period until it's resolved. A Low battery warning finishes its [configured blinks](docs/battery-feedback.md#battery-warning-blinks) once started. Connection warnings take priority over battery warnings.
+
+While a warning is active, layer feedback and on-demand battery displays are suppressed. Turning the display off hides connection warnings and cancels any battery-warning.
 
 ## Compatibility
 
@@ -106,8 +104,7 @@ These options are shared between this module's feedback features. Use them in yo
 | `CONFIG_ZMK_LED_FEEDBACK_BRIGHTNESS_STEP`                                        | `16`    | Brightness change for each key press.                                                                      |
 | `CONFIG_ZMK_LED_FEEDBACK_BLINK_INTERVAL_MS`                                      | `500`   | Warning phase duration in milliseconds; accepted range is `100-1000`.                                      |
 
-Brightness values must satisfy `minimum <= initial <= maximum`; invalid ranges or ordering fail
-the build instead of silently clamping the initial value.
+Brightness values must satisfy `minimum <= initial brightness <= maximum`. Invalid values fail the build instead of silently using the devault value.
 
 ##### Example
 
