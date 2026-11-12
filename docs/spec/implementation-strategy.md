@@ -1,8 +1,8 @@
-# Simplified implementation strategy
+# Implementation strategy
 
 ## Purpose
 
-Implement [the simplified specification](simplified-spec.md) in stages. The specification is the source of truth for behavior; this document describes the order of work and the checks between stages. Backward compatibility is not required.
+Implement [the specification](spec.md) in stages. The specification is the source of truth for behavior; this document describes the order of work and the checks between stages. Backward compatibility is not required.
 
 Rewrite warning arbitration and scheduling within the existing module. Reuse suitable rendering, ZMK integration, behaviors, and configuration validation, but remove obsolete warning paths rather than running old and new implementations side by side. If the warning code cannot be separated cleanly from retained feedback, stop and reassess a full rewrite before expanding scope.
 
@@ -31,7 +31,7 @@ ctest --test-dir build/config-validation --output-on-failure
 
 ### Stage 0 baseline
 
-Recorded on the `simplified` branch before implementation changes:
+Recorded on the `main` branch before implementation changes:
 
 - The existing CMake/CTest configuration suite passed all 22 tests. CMake 3.31.6 emitted a developer warning about policy `CMP0174` and an empty `LAYER_COLORS` argument; the tests still passed.
 - The test dongle firmware built successfully for `nice_nano_v2` with ZMK `v0.3`, Zephyr 3.5.0, and Zephyr SDK 0.16.9. Its effective configuration enabled split-central mode, the module, connection feedback, battery feedback, and a 15% battery-warning threshold. The build produced a UF2; its temporary container build directory was not retained.
@@ -166,25 +166,25 @@ docker run --rm --entrypoint sh \
 
 ### Approved connection-cutoff revision
 
-- The authoritative [simplified specification](simplified-spec.md) now limits connection warnings to complete red phases whose interval fits before the 20-second deadline. The final fit check uses monotonic time immediately before output; a queued phase that fails the check does not preempt battery feedback. Deadline handling closes warning state logically, with physical clearing subject to normal scheduler latency.
+- The authoritative [specification](spec.md) now limits connection warnings to complete red phases whose interval fits before the 20-second deadline. The final fit check uses monotonic time immediately before output; a queued phase that fails the check does not preempt battery feedback. Deadline handling closes warning state logically, with physical clearing subject to normal scheduler latency.
 - The warning state/runtime suite now passes 39 cases, including exact-fit phases, insufficient remaining time, delayed render suppression, and preservation of active battery output when a connection phase is suppressed.
 - The hardware plan now reflects the cutoff rule. Test 2/3 observations made with the previous firmware behavior are historical and must be repeated with firmware built from this revision.
 - After this change, all seven firmware profiles built against ZMK v0.3 with effective settings verified. The real-ZMK validation script passed 43 scenarios, the host config suite passed 50 tests, and all 39 state/runtime tests passed both normally and under address/undefined-behavior sanitizers. The revised images still need to be flashed and the affected hardware checks repeated.
 
 ## Stage 5: Documentation and hardware validation
 
-1. Update the README and existing connection, battery, display-off, keycode, and peripheral-numbering documentation to match the implemented configuration and behavior. Remove obsolete override, startup-off, repeat, and layer-override instructions. Keep the simplified spec and this strategy consistent with any approved implementation decisions.
+1. Update the README and existing connection, battery, display-off, keycode, and peripheral-numbering documentation to match the implemented configuration and behavior. Remove obsolete override, startup-off, repeat, and layer-override instructions. Keep the spec and this strategy consistent with any approved implementation decisions.
 2. Explain the 20-second detection window, render-time connection-phase cutoff and no connection-warning spillover, possible battery-warning spillover, display-off cancellation, shared required-peripheral filter, and the fact that missing or zero battery readings do not trigger a warning. Document the single no-reading LED and the possibility that a genuine 0% reading is treated as unavailable.
 3. On representative hardware, follow the specification's timing-validation plan. Record module initialization, required peripheral connections, and first valid battery reports across multiple cold starts, sleeping and already-awake peripherals, staggered power-on, and reconnects. Record late or missing reports as well as successful timings.
 4. Observe the LED sequences and user controls on hardware, including near-deadline red-phase admission, no connection-warning spillover, connection-to-battery priority, a battery-warning restart, and display-off cancellation. Retest any previous observation that depended on the old minimum-blink behavior. Test the ordinary layer and battery workflows after boot.
 
-Use the complete configurations and step-by-step procedures in [the hardware test plan](simplified-hardware-tests.md). Verify every profile builds with the effective settings before hardware testing.
+Use the complete configurations and step-by-step procedures in [the hardware test plan](hardware-tests.md). Verify every profile builds with the effective settings before hardware testing.
 
 **Gate:** documentation matches the final implementation, automated checks remain green, and hardware observations are recorded. If hardware or a required toolchain is unavailable, state which checks remain unverified and provide the commands or procedure needed to complete them; do not report those checks as passed.
 
 ## Completion criteria
 
-- All acceptance cases in the [simplified specification](simplified-spec.md#acceptance-tests) are covered by an appropriate automated test, firmware build, or explicitly recorded hardware check.
+- All acceptance cases in the [specification](spec.md#acceptance-tests) are covered by an appropriate automated test, firmware build, or explicitly recorded hardware check.
 - Old warning code and removed options are gone; retained module features and user controls work under the new arbitration rules.
 - Host tests and the representative ZMK firmware matrix pass, with no unrelated regressions introduced.
 - Hardware timing and visual checks are completed, or the remaining limitations and exact follow-up are documented.

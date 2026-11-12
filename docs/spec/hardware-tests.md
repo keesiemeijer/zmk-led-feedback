@@ -1,8 +1,8 @@
-# Simplified hardware test plan
+# hardware test plan
 
 ## Status
 
-Run these checks after the relevant implementation and automated tests are complete. They are a plan, not results from tests already performed. The [simplified specification](simplified-spec.md) controls expected behavior.
+Run these checks after the relevant implementation and automated tests are complete. They are a plan, not results from tests already performed. The [specification](spec.md) controls expected behavior.
 
 The configurations use the current option names. All seven dongle profiles and the awake, sleep,
 and no-report peripheral configurations were built against ZMK v0.3; every explicitly requested
@@ -279,7 +279,7 @@ CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER="1,2"
 
 ## Build and flash procedure
 
-Use the existing ZMK v0.3 West workspace and local Docker image described in the [Stage 0 baseline](simplified-implementation-strategy.md#stage-0-baseline). Copy the complete Lily58 `config` directory to a new isolated test directory, use the complete peripheral configurations above, and choose one complete dongle profile. The workspace's active West manifest must still use ZMK v0.3. The `lily58` module supplies the real shield, layout, and hooks; this module must be mounted from the branch under test, not fetched from the Lily58 manifest's `warning-types` revision.
+Use the existing ZMK v0.3 West workspace and local Docker image described in the [Stage 0 baseline](implementation-strategy.md#stage-0-baseline). Copy the complete Lily58 `config` directory to a new isolated test directory, use the complete peripheral configurations above, and choose one complete dongle profile. The workspace's active West manifest must still use ZMK v0.3. The `lily58` module supplies the real shield, layout, and hooks; this module must be mounted from the branch under test, not fetched from the Lily58 manifest's `warning-types` revision.
 
 In the following commands, `TEST_DIR` is the absolute path to the isolated test directory containing `config/`. Create a fresh output directory for each profile; do not reuse an existing build directory or delete a user's existing build. Set `PROFILE` to `a`, `b`, `c`, `d`, `e`, `f`, or `g` to label the output. These commands require the same macOS workspace layout and Docker image as Stage 0:
 
