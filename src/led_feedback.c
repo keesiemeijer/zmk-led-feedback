@@ -727,6 +727,7 @@ void zmk_led_feedback_show_battery(int number) {
 #endif
 }
 
+// Handles warning work, updating the LED strip based on the current warning state.
 #if LF_TRACK_WARNINGS
 static void warning_work_handler(struct k_work *work) {
     if (!device_is_ready(strip)) {
