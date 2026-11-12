@@ -133,7 +133,7 @@ Use them in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER`                            | `y`               | Enable active-layer indication.                                                                         |
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS`                     | `"00FF00,FFFF00"` | Comma-separated `RRGGBB` colors for layer groups; each color is used until the strip fills.             |
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER`           | `""`              | Optional per-layer color palette; when set, overrides `LAYER_COLORS`.                                   |
-| `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER_LED_COUNT` | `0`               | With per-layer colors: `0` cycles, `-1` lights all LEDs, or `1..strip length` lights a fixed count.     |
+| `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER_LED_COUNT` | `0`               | `0` Default. same as `COLORS_PER_LAYER`, `-1` lights all LEDs, `N` lights N LEDs.                       |
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON`                  | `n`               | Keep showing the active layer. Can be toggled with [`LF_LAYER_TOG`](docs/keycodes.md#general-keycodes). |
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON_LAYERS`           | `""`              | Comma-separated layer numbers (for example `"2,7"`) to keep showing even when `LAYER_ALWAYS_ON` is off. |
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER_DURATION_MS`                | `1000`            | How long to show the layer after a layer change.                                                        |
@@ -152,10 +152,10 @@ Find out more about connection feedback in the [connection feedback documentatio
 
 Use them in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-file) file for the dongle:
 
-| Option                                         | Default | Description                                                                                |
-| ---------------------------------------------- | ------- | ------------------------------------------------------------------------------------------ |
-| `CONFIG_ZMK_LED_FEEDBACK_CONNECTION`           | `n`     | Enable boot-only connection warnings.                                                      |
-| `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS` | `-1`    | Shared warning filter: `-1` means all, `0` none, or `1..N` mapped device numbers required. |
+| Option                                         | Default | Description                                                         |
+| ---------------------------------------------- | ------- | ------------------------------------------------------------------- |
+| `CONFIG_ZMK_LED_FEEDBACK_CONNECTION`           | `n`     | Enable boot-only connection warnings.                               |
+| `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS` | `-1`    | `-1` means all, `0` none, or `1..N` mapped device numbers required. |
 
 ### Battery feedback
 
@@ -195,11 +195,11 @@ Use them in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-
 
 When a peripheral first pairs with the dongle, it is assigned a [pairing slot number](docs/peripheral-numbering.md#device-numbers-and-pairing-slots). The dongle keeps that assignment when the dongle or any of the peripherals disconnects and reconnects.
 
-This option allows you to change the device-number mapping without re-pairing peripherals to the dongle. Use it in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-file) file for the dongle.
+This option allows you to change the pairing order without re-pairing peripherals to the dongle. Use it in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-file) file for the dongle.
 
-| Option                               | Default | Description                                                                                        |
-| ------------------------------------ | ------- | -------------------------------------------------------------------------------------------------- |
-| `CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER` | `""`    | Maps pairing slots to device numbers for warnings and battery display; empty means identity order. |
+| Option                               | Default | Description                                                                                                          |
+| ------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------- |
+| `CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER` | `""`    | Maps pairing slots to device numbers for warnings and battery display; empty means don't re-order the pairing order. |
 
 For an example of this option see [peripheral numbering documentation](docs/peripheral-numbering.md#changing-the-pairing-order)
 
