@@ -49,6 +49,28 @@ static uint32_t missing_slots(const struct lf_warning_state *state) {
     return missing;
 }
 
+static struct lf_warning_output connection_output(const struct lf_warning_state *state,
+                                                  bool red) {
+    struct lf_warning_output output = {.type = LF_WARNING_OUTPUT_CONNECTION};
+    if (!red) {
+        return output;
+    }
+
+    uint32_t missing = missing_slots(state);
+    uint8_t highest_number = 0;
+    for (uint8_t slot = 0; slot < state->config.peripheral_count; slot++) {
+        if ((missing & (UINT32_C(1) << slot)) &&
+            state->config.device_numbers[slot] > highest_number) {
+            highest_number = state->config.device_numbers[slot];
+        }
+    }
+    output.led_count = state->config.strip_length < state->config.peripheral_count
+                           ? state->config.strip_length
+                           : highest_number;
+    output.color = LF_WARNING_RED;
+    return output;
+}
+
 static void start_battery(struct lf_warning_state *state, uint64_t now_ms) {
     state->battery_status = LF_WARNING_BATTERY_ACTIVE;
     state->battery_started = true;
@@ -58,21 +80,20 @@ static void start_battery(struct lf_warning_state *state, uint64_t now_ms) {
 }
 
 static void finish_connection(struct lf_warning_state *state, uint64_t now_ms) {
+    state->connection_pending = false;
     state->connection_active = false;
+    state->connection_red = false;
+    state->connection_phase_pending = false;
     state->phase_deadline_ms = LF_WARNING_NO_DEADLINE;
     if (state->display_enabled && state->battery_status == LF_WARNING_BATTERY_PENDING) {
         start_battery(state, now_ms);
     }
 }
 
-static void start_connection(struct lf_warning_state *state, uint64_t now_ms) {
-    if (state->battery_status == LF_WARNING_BATTERY_ACTIVE) {
-        state->battery_status = LF_WARNING_BATTERY_PENDING;
+static void queue_connection(struct lf_warning_state *state) {
+    if (!state->connection_active) {
+        state->connection_pending = true;
     }
-    state->connection_active = true;
-    state->connection_red = true;
-    state->connection_blinks_completed = 0;
-    state->phase_deadline_ms = now_ms + state->config.blink_interval_ms;
 }
 
 static void reconcile_boot(struct lf_warning_state *state, uint64_t now_ms) {
@@ -81,11 +102,15 @@ static void reconcile_boot(struct lf_warning_state *state, uint64_t now_ms) {
     }
 
     bool connection_needed = state->config.connection_enabled && missing_slots(state);
-    if (connection_needed && !state->connection_active) {
-        start_connection(state, now_ms);
+    if (connection_needed) {
+        queue_connection(state);
     } else if (!connection_needed && state->connection_active) {
         finish_connection(state, now_ms);
-    } else if (!connection_needed && state->battery_status == LF_WARNING_BATTERY_PENDING) {
+    } else {
+        state->connection_pending = false;
+    }
+    if (!connection_needed && !state->connection_active &&
+        state->battery_status == LF_WARNING_BATTERY_PENDING) {
         start_battery(state, now_ms);
     }
 }
@@ -110,12 +135,15 @@ bool lf_warning_init(struct lf_warning_state *state, const struct lf_warning_con
 void lf_warning_advance(struct lf_warning_state *state, uint64_t now_ms) {
     if (!state->boot_closed && now_ms >= state->boot_deadline_ms) {
         state->boot_closed = true;
-        state->eligible_missing_slots = state->connection_active ? missing_slots(state) : 0;
+        state->connection_pending = false;
         if (!state->display_enabled && state->battery_status == LF_WARNING_BATTERY_PENDING) {
             state->battery_status = LF_WARNING_BATTERY_DONE;
         }
-        if (state->connection_active && state->connection_blinks_completed >= 2) {
+        if (state->connection_active) {
             finish_connection(state, now_ms);
+        } else if (state->display_enabled &&
+                   state->battery_status == LF_WARNING_BATTERY_PENDING) {
+            start_battery(state, now_ms);
         }
     }
 
@@ -125,14 +153,12 @@ void lf_warning_advance(struct lf_warning_state *state, uint64_t now_ms) {
 
     if (state->connection_active) {
         if (state->connection_red) {
-            state->connection_blinks_completed++;
-            if (state->boot_closed && state->connection_blinks_completed >= 2) {
-                finish_connection(state, now_ms);
-                return;
-            }
+            state->connection_red = false;
+            state->phase_deadline_ms = now_ms + state->config.blink_interval_ms;
+        } else {
+            state->connection_phase_pending = true;
+            state->phase_deadline_ms = LF_WARNING_NO_DEADLINE;
         }
-        state->connection_red = !state->connection_red;
-        state->phase_deadline_ms = now_ms + state->config.blink_interval_ms;
     } else if (state->battery_status == LF_WARNING_BATTERY_ACTIVE) {
         if (state->battery_phase == LF_WARNING_BATTERY_RED) {
             state->battery_phase = LF_WARNING_BATTERY_YELLOW;
@@ -153,6 +179,42 @@ void lf_warning_advance(struct lf_warning_state *state, uint64_t now_ms) {
     }
 }
 
+bool lf_warning_render_connection_phase(struct lf_warning_state *state, uint64_t phase_start_ms) {
+    lf_warning_advance(state, phase_start_ms);
+
+    bool phase_pending = state->connection_pending ||
+                         (state->connection_active && state->connection_phase_pending);
+    if (!phase_pending) {
+        return false;
+    }
+
+    bool fits_before_deadline =
+        !state->boot_closed && phase_start_ms <= state->boot_deadline_ms &&
+        state->config.blink_interval_ms <= state->boot_deadline_ms - phase_start_ms;
+    if (!state->display_enabled || !fits_before_deadline || !missing_slots(state)) {
+        if (state->connection_active) {
+            finish_connection(state, phase_start_ms);
+        } else {
+            state->connection_pending = false;
+            if (state->display_enabled &&
+                state->battery_status == LF_WARNING_BATTERY_PENDING) {
+                start_battery(state, phase_start_ms);
+            }
+        }
+        return false;
+    }
+
+    if (!state->connection_active && state->battery_status == LF_WARNING_BATTERY_ACTIVE) {
+        state->battery_status = LF_WARNING_BATTERY_PENDING;
+    }
+    state->connection_pending = false;
+    state->connection_active = true;
+    state->connection_red = true;
+    state->connection_phase_pending = false;
+    state->phase_deadline_ms = phase_start_ms + state->config.blink_interval_ms;
+    return true;
+}
+
 void lf_warning_connection_event(struct lf_warning_state *state, uint64_t now_ms, uint8_t slot,
                                  bool connected) {
     lf_warning_advance(state, now_ms);
@@ -163,12 +225,6 @@ void lf_warning_connection_event(struct lf_warning_state *state, uint64_t now_ms
     uint32_t bit = UINT32_C(1) << slot;
     if (connected) {
         state->connected_slots |= bit;
-        if (state->boot_closed && state->connection_active) {
-            state->eligible_missing_slots &= ~bit;
-            if (!state->eligible_missing_slots) {
-                finish_connection(state, now_ms);
-            }
-        }
     } else {
         state->connected_slots &= ~bit;
         state->battery_levels[slot] = 0;
@@ -200,7 +256,10 @@ void lf_warning_set_display(struct lf_warning_state *state, uint64_t now_ms, boo
 
     state->display_enabled = enabled;
     if (!enabled) {
+        state->connection_pending = false;
         state->connection_active = false;
+        state->connection_red = false;
+        state->connection_phase_pending = false;
         state->phase_deadline_ms = LF_WARNING_NO_DEADLINE;
         if (state->battery_started && (state->battery_status == LF_WARNING_BATTERY_ACTIVE ||
                                        state->battery_status == LF_WARNING_BATTERY_PENDING)) {
@@ -220,6 +279,17 @@ uint64_t lf_warning_next_deadline(const struct lf_warning_state *state) {
     return state->phase_deadline_ms;
 }
 
+struct lf_warning_output lf_warning_get_connection_candidate(const struct lf_warning_state *state) {
+    struct lf_warning_output output = {0};
+    if (!state->display_enabled || state->boot_closed ||
+        !(state->connection_pending ||
+          (state->connection_active && state->connection_phase_pending)) ||
+        !missing_slots(state)) {
+        return output;
+    }
+    return connection_output(state, true);
+}
+
 struct lf_warning_output lf_warning_get_output(const struct lf_warning_state *state) {
     struct lf_warning_output output = {0};
     if (!state->display_enabled) {
@@ -227,23 +297,7 @@ struct lf_warning_output lf_warning_get_output(const struct lf_warning_state *st
     }
 
     if (state->connection_active) {
-        output.type = LF_WARNING_OUTPUT_CONNECTION;
-        if (!state->connection_red) {
-            return output;
-        }
-
-        uint32_t missing = state->boot_closed ? state->eligible_missing_slots : missing_slots(state);
-        uint8_t highest_number = 0;
-        for (uint8_t slot = 0; slot < state->config.peripheral_count; slot++) {
-            if ((missing & (UINT32_C(1) << slot)) &&
-                state->config.device_numbers[slot] > highest_number) {
-                highest_number = state->config.device_numbers[slot];
-            }
-        }
-        output.led_count = state->config.strip_length < state->config.peripheral_count
-                               ? state->config.strip_length
-                               : highest_number;
-        output.color = LF_WARNING_RED;
+        return connection_output(state, state->connection_red);
     } else if (state->battery_status == LF_WARNING_BATTERY_ACTIVE) {
         output.type = LF_WARNING_OUTPUT_BATTERY;
         if (state->battery_phase != LF_WARNING_BATTERY_PAUSE) {

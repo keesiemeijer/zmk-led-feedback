@@ -110,21 +110,27 @@ static bool feedback_can_show(enum feedback_source source) {
 
 // Updates the LED strip with the specified number of lit LEDs and color.
 // The LEDs fill up from the last to the first if reversed is enabled.
-static void update_strip(int lit, struct led_rgb color, enum feedback_source source) {
-    k_mutex_lock(&strip_lock, K_FOREVER);
-    bool visible = feedback_can_show(source);
-    if (!visible && atomic_get(&leds_enabled)) {
-        k_mutex_unlock(&strip_lock);
-        return;
-    }
-
+static void fill_pixels_locked(int lit, struct led_rgb color, bool visible) {
     for (int i = 0; i < STRIP_LEN; i++) {
         // Reversed: LEDs fill up from the last LED to the first.
         int pos = IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_REVERSE) ? STRIP_LEN - 1 - i : i;
         pixels[pos] = visible && i < lit ? color : (struct led_rgb){0};
     }
+}
 
+static void update_strip_locked(int lit, struct led_rgb color, enum feedback_source source) {
+    bool visible = feedback_can_show(source);
+    if (!visible && atomic_get(&leds_enabled)) {
+        return;
+    }
+
+    fill_pixels_locked(lit, color, visible);
     led_strip_update_rgb(strip, pixels, STRIP_LEN);
+}
+
+static void update_strip(int lit, struct led_rgb color, enum feedback_source source) {
+    k_mutex_lock(&strip_lock, K_FOREVER);
+    update_strip_locked(lit, color, source);
     k_mutex_unlock(&strip_lock);
 }
 
@@ -723,39 +729,93 @@ void zmk_led_feedback_show_battery(int number) {
 
 #if LF_TRACK_WARNINGS
 static void warning_work_handler(struct k_work *work) {
+    if (!device_is_ready(strip)) {
+        k_spinlock_key_t key = k_spin_lock(&warning_lock);
+        if (warning_ready) {
+            k_work_reschedule(&warning_work, K_MSEC(100));
+        }
+        k_spin_unlock(&warning_lock, key);
+        return;
+    }
+
+    k_mutex_lock(&strip_lock, K_FOREVER);
     k_spinlock_key_t key = k_spin_lock(&warning_lock);
     if (!warning_ready) {
         k_spin_unlock(&warning_lock, key);
+        k_mutex_unlock(&strip_lock);
         return;
     }
 
     uint64_t now_ms = k_uptime_get();
     lf_warning_advance(&warning_state, now_ms);
+    struct lf_warning_output candidate =
+        lf_warning_get_connection_candidate(&warning_state);
     struct lf_warning_output output = lf_warning_get_output(&warning_state);
     uint64_t deadline = lf_warning_next_deadline(&warning_state);
+    k_spin_unlock(&warning_lock, key);
+
+    if (candidate.type == LF_WARNING_OUTPUT_CONNECTION) {
+        fill_pixels_locked(candidate.led_count, scale_rgb(candidate.color), true);
+        key = k_spin_lock(&warning_lock);
+        uint64_t phase_start_ms = k_uptime_get();
+        bool rendered = lf_warning_render_connection_phase(&warning_state, phase_start_ms);
+        if (!rendered) {
+            output = lf_warning_get_output(&warning_state);
+            deadline = lf_warning_next_deadline(&warning_state);
+        }
+        k_spin_unlock(&warning_lock, key);
+
+        if (rendered) {
+            if (!atomic_get(&leds_enabled)) {
+                fill_pixels_locked(0, (struct led_rgb){0}, false);
+            }
+            led_strip_update_rgb(strip, pixels, STRIP_LEN);
+            warning_rendered = true;
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
+            k_work_cancel_delayable(&layer_show_work);
+            k_work_cancel_delayable(&layer_clear_work);
+            layer_active = false;
+            layer_feedback_requested = false;
+            layer_change_requested = false;
+            brightness_preview = false;
+#endif
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
+            battery_cancel();
+#endif
+
+            key = k_spin_lock(&warning_lock);
+            now_ms = k_uptime_get();
+            deadline = lf_warning_next_deadline(&warning_state);
+            if (deadline != LF_WARNING_NO_DEADLINE) {
+                k_work_schedule(&warning_work,
+                                K_MSEC(deadline > now_ms ? deadline - now_ms : 0));
+            }
+            k_spin_unlock(&warning_lock, key);
+            k_mutex_unlock(&strip_lock);
+            return;
+        }
+    }
+
+    key = k_spin_lock(&warning_lock);
+    now_ms = k_uptime_get();
+    deadline = lf_warning_next_deadline(&warning_state);
     if (deadline != LF_WARNING_NO_DEADLINE) {
         k_work_reschedule(&warning_work, K_MSEC(deadline > now_ms ? deadline - now_ms : 0));
     }
     k_spin_unlock(&warning_lock, key);
 
-    if (!device_is_ready(strip)) {
-        if (output.type != LF_WARNING_OUTPUT_NONE) {
-            key = k_spin_lock(&warning_lock);
-            k_work_reschedule(&warning_work, K_MSEC(100));
-            k_spin_unlock(&warning_lock, key);
-        }
-        return;
-    }
-
     if (output.type == LF_WARNING_OUTPUT_NONE) {
         if (warning_rendered) {
             warning_rendered = false;
+            k_mutex_unlock(&strip_lock);
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
             layer_clear_handler(NULL);
 #else
             update_strip(0, (struct led_rgb){0}, FEEDBACK_NONE);
 #endif
+            return;
         }
+        k_mutex_unlock(&strip_lock);
         return;
     }
 
@@ -774,6 +834,7 @@ static void warning_work_handler(struct k_work *work) {
     enum feedback_source source = output.type == LF_WARNING_OUTPUT_CONNECTION
                                       ? FEEDBACK_CONNECTION_WARNING
                                       : FEEDBACK_BATTERY_WARNING;
-    update_strip(output.led_count, scale_rgb(output.color), source);
+    update_strip_locked(output.led_count, scale_rgb(output.color), source);
+    k_mutex_unlock(&strip_lock);
 }
 #endif

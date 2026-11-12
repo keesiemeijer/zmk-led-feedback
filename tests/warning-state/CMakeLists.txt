@@ -19,8 +19,8 @@ foreach(case IN ITEMS
 		connection_priority
 		unresolved_connection
 		boot_cutoff
-		late_connection_minimum
-		late_second_connection
+		connection_render_deadline_boundaries
+		suppressed_connection_preserves_battery
 		delayed_deadline
 		post_deadline_reconnects
 		delayed_blink_work
@@ -65,6 +65,11 @@ foreach(case IN ITEMS priority_and_restore display_controls controls_during_batt
 	brightness_stops_at_bounds early_connection battery_only_feedback
 	interrupted_battery_display battery_restart delayed_deadline display_off_before_init layer_hooks)
 	add_test(NAME "warning_runtime_${case}" COMMAND warning_runtime_test "${case}")
+endforeach()
+foreach(case IN ITEMS connection_phase_exact_deadline delayed_connection_render
+	suppressed_connection_preserves_battery)
+	add_test(NAME "warning_runtime_${case}"
+		COMMAND warning_runtime_test "${case}")
 endforeach()
 
 add_executable(warning_runtime_battery_only_test ../warning-runtime/runtime_test.c ../warning-runtime/test_hooks.c ../../src/warning_state.c)

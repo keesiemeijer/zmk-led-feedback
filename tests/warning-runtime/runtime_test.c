@@ -250,20 +250,83 @@ static int test_delayed_deadline(void) {
     CHECK(led_feedback_init() == 0);
     connect_slot(0);
     connect_slot(1);
-    CHECK(run_until(19900) == 0);
+    CHECK(run_until(0) == 0);
+    fake_now_ms = 19900;
     disconnect_slot(0);
     CHECK(run_until(19900) == 0);
-    CHECK(pixels_match(64, 0, 0, 1));
+    CHECK(!warning_state.connection_active);
+    CHECK(pixels_match(0, 0, 0, 0));
+
     fake_now_ms = 20001;
     disconnect_slot(1);
     CHECK(warning_state.boot_closed);
-    CHECK(warning_state.eligible_missing_slots == 1);
-    CHECK(run_until(20001) == 0);
-    CHECK(pixels_match(64, 0, 0, 1));
-    connect_slot(0);
     CHECK(run_until(20001) == 0);
     CHECK(pixels_match(0, 0, 0, 0));
     CHECK(!warning_state.connection_active);
+    CHECK(warning_state.connected_slots == 0);
+    return 0;
+}
+
+static int test_connection_phase_exact_deadline(void) {
+    CHECK(led_feedback_init() == 0);
+    connect_slot(0);
+    connect_slot(1);
+    CHECK(run_until(0) == 0);
+
+    fake_now_ms = 19500;
+    disconnect_slot(0);
+    CHECK(run_until(19500) == 0);
+    CHECK(warning_state.connection_active);
+    CHECK(warning_state.phase_deadline_ms == 20000);
+    CHECK(pixels_match(64, 0, 0, 1));
+
+    CHECK(run_until(20000) == 0);
+    CHECK(!warning_state.connection_active);
+    CHECK(pixels_match(0, 0, 0, 0));
+    return 0;
+}
+
+static int test_delayed_connection_render(void) {
+    CHECK(led_feedback_init() == 0);
+    connect_slot(0);
+    connect_slot(1);
+    CHECK(run_until(0) == 0);
+
+    fake_now_ms = 19400;
+    disconnect_slot(0);
+    CHECK(warning_state.connection_pending);
+    CHECK(!warning_state.connection_active);
+    fake_now_ms = 19501;
+    warning_work.pending = false;
+    warning_work_handler(NULL);
+    CHECK(!warning_state.connection_pending);
+    CHECK(!warning_state.connection_active);
+    CHECK(pixels_match(0, 0, 0, 0));
+    return 0;
+}
+
+static int test_suppressed_connection_preserves_battery(void) {
+    CHECK(led_feedback_init() == 0);
+    connect_slot(0);
+    connect_slot(1);
+    CHECK(run_until(0) == 0);
+
+    fake_now_ms = 19500;
+    report_battery(0, 10);
+    CHECK(run_until(19500) == 0);
+    CHECK(warning_state.battery_status == LF_WARNING_BATTERY_ACTIVE);
+    CHECK(pixels_match(64, 0, 0, 4));
+
+    fake_now_ms = 19501;
+    disconnect_slot(1);
+    CHECK(warning_state.connection_pending);
+    fake_now_ms = 19502;
+    warning_work.pending = false;
+    warning_work_handler(NULL);
+    CHECK(!warning_state.connection_active);
+    CHECK(!warning_state.connection_pending);
+    CHECK(warning_state.battery_status == LF_WARNING_BATTERY_ACTIVE);
+    CHECK(pixels_match(64, 0, 0, 4));
     return 0;
 }
 
@@ -336,6 +399,9 @@ int main(int argc, char **argv) {
         {"battery_only_required_filter", test_battery_only_required_filter},
         {"battery_restart", test_battery_restart},
         {"delayed_deadline", test_delayed_deadline},
+        {"connection_phase_exact_deadline", test_connection_phase_exact_deadline},
+        {"delayed_connection_render", test_delayed_connection_render},
+        {"suppressed_connection_preserves_battery", test_suppressed_connection_preserves_battery},
         {"display_off_before_init", test_display_off_before_init},
         {"layer_hooks", test_layer_hooks},
         {"mapped_required_filter", test_mapped_required_filter},

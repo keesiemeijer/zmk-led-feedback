@@ -6,9 +6,10 @@ Run these checks after the relevant implementation and automated tests are compl
 
 The configurations use the current option names. All seven dongle profiles and the awake, sleep,
 and no-report peripheral configurations were built against ZMK v0.3; every explicitly requested
-setting matched the generated `.config`. These builds were not flashed or tested on hardware.
-Recheck the effective configuration for your own builds; do not silently drop an option or assume
-a successful build means the requested value was applied.
+setting matched the generated `.config`. Hardware Tests 1-3 were reported as passing on firmware
+built before the revised connection cutoff was implemented. Those observations do not validate
+the new cutoff; rebuild and repeat the affected connection-warning cases before treating them as
+passes for the revised behavior. Recheck effective settings for each build.
 
 ## Hardware and preparation
 
@@ -364,9 +365,11 @@ Flash the resulting `build/<output>/zephyr/zmk.uf2` to the corresponding device 
 
 1. Connect the dongle and both halves. Power-cycle the dongle and observe for at least 30 seconds; change layers and use the key bindings from the preparation section.
 2. Show each battery with `&led_bat 1`, `&led_bat 2`, and `&led_bat 0`. Switch the display off and back on, and test brightness up and down.
-3. Power-cycle the dongle with one or both halves off. Observe for at least 30 seconds. When possible, reconnect the left half and request the missing right half's battery after boot.
+3. Power-cycle the dongle with one or both halves off. Observe for at least 30 seconds. When possible, reconnect the left half and request the missing right half's battery after boot.ss
 
 **Expected:** no automatic connection or battery warnings, even if a required device is missing or a battery would be below the test threshold. Ordinary layer feedback, battery requests, display controls, and brightness previews work when the display is on. A missing or zero battery reading shows one no-reading LED, blue with the default battery palette. Turning the display off keeps the strip dark until a display-on or brightness control turns it back on.
+
+Passed with expected behaviour.
 
 ### 2. Connection warning priority
 
@@ -374,19 +377,23 @@ Flash the resulting `build/<output>/zephyr/zmk.uf2` to the corresponding device 
 
 1. Leave device 1 on and device 2 off, then power-cycle the dongle. Observe the initial connection and the rest of the 20-second boot window.
 2. Once device 1 has connected, use its keys to switch layers and request layer feedback while device 2 remains off. Test `LF_OFF` and, before the deadline, `LF_ON` or a brightness key.
-3. In a separate run, power device 2 on during boot. In another run, leave it off until after boot and then power it on. After a boot with both devices connected, turn device 2 off after the deadline.
+3. In a separate run, power device 2 on during boot. In another run, leave it off until well after boot, then power it on. For a coarse no-new-warning check, power-cycle with both devices connected, wait at least 30 seconds from dongle power-on, then turn device 2 off and observe for five seconds. A trace-confirmed run can instead use the recorded module deadline and processed-disconnection timestamp.
 
-**Expected:** the connection warning starts during the 20-second boot window while required devices are missing and updates as they connect. With only device 2 missing, two red LEDs blink. Layer changes and requests do not replace the warning, although the keyboard changes layers normally. Display off stops all LEDs; turning it on before the deadline shows any still-eligible connection warning instead of a preview. The warning stops as soon as both required devices connect or, if still missing, after satisfying the two-blink minimum. A disconnection processed at or after the deadline does not start or extend it. There is no battery warning in this profile.
+**Expected:** the connection warning starts during the 20-second boot window while required devices are missing and updates as they connect. With only device 2 missing, two red LEDs are lit during a red phase. Layer changes and requests do not replace a rendered warning, although the keyboard changes layers normally. Display off stops all LEDs; turning it on before the deadline shows an eligible warning instead of a preview. A red phase ending exactly at the deadline counts as complete; one that would overrun is suppressed rather than shortened. Connection output does not continue after boot. There is no battery warning in this profile.
+
+**Recorded result:** passed with the previous firmware behavior. Repeat with the revised-cutoff firmware; this observation does not verify its deadline rule.
 
 ### 3. Low battery after unresolved connection
 
-**Configuration:** Profile F and the complete awake peripheral configurations. Device 1 must report `1-99` during boot; use the verified trace for the report timing. Repeat a representative run with complete Profile C to observe behavior without USB tracing.
+**Configuration:** Profile F and the complete awake peripheral configurations. Keep device 1 on and device 2 off. Device 1 must report a nonzero level below 100% during boot. Profile F's USB logging alone does not expose module-processed battery events; temporary instrumentation is needed only to prove the exact event timestamp. Repeat a representative run with complete Profile C to observe behavior without USB logging.
 
-1. Power on device 1 and leave device 2 off. Power-cycle the dongle and record the full boot and subsequent LEDs.
-2. Confirm from the trace that device 1's nonzero low report was processed before the deadline while device 2 remained missing.
-3. Wait until all LEDs finish, then observe beyond the end of boot without power-cycling.
+1. Note device 1's reported battery percentage. Power on device 1, leave device 2 off, then power-cycle the dongle and record the LEDs through boot and afterward.
+2. Observe the connection warning while device 2 is missing. At the logical deadline, connection output should stop; if device 1's low report was processed during boot, the battery sequence should then run.
+3. Wait until all LEDs finish and confirm the battery sequence does not repeat without another boot.
 
-**Expected:** connection red blinks take priority for the boot window; once the connection warning ends, the full five-blink red/yellow battery sequence runs, even though device 2 remains missing. It is not repeated. A missing battery report from device 2 alone never produces a battery warning. If the low report cannot be confirmed before boot closes, the battery portion is inconclusive.
+**Expected:** rendered connection red phases take priority during boot. At the logical deadline, connection output stops and the full five-cycle red/yellow battery sequence starts if the low report was processed during boot, even though device 2 remains missing. It is not repeated. A missing battery report from device 2 alone never produces a battery warning. If the battery sequence does not appear, or exact event timing matters but instrumentation is unavailable, mark that portion inconclusive rather than inferring the report timing from the battery percentage shown on the half.
+
+**Recorded result:** the visual sequence passed with the previous firmware behavior. Repeat with the revised-cutoff firmware; the previous run does not verify this connection cutoff.
 
 ### 4. Low battery after connection resolves
 
@@ -406,17 +413,17 @@ Flash the resulting `build/<output>/zephyr/zmk.uf2` to the corresponding device 
 2. Wait until after boot and request each battery level; then observe without rebooting.
 3. With Profile F and both halves on, power-cycle the dongle. After the connection warning clears and the battery sequence starts, turn one required half off before that sequence finishes and before boot ends. In separate runs, reconnect it before the deadline and leave it off through the deadline. Confirm the processed event ordering in the trace.
 
-**Expected:** Profile D shows a full battery warning on a qualifying report but no connection warning, even when device 2 is missing. Once the battery warning completes, further low reports do not repeat it, and on-demand battery displays work after boot. In step 3, a connection warning interrupts a battery warning only if the disconnection is processed before the deadline; when the connection warning ends, the battery warning starts again from its first red phase and completes in full. Partial battery blinks may repeat. If the disconnect is processed too late or the battery sequence has already completed, retry and mark the attempted interruption inconclusive.
+**Expected:** Profile D shows a full battery warning on a qualifying report but no connection warning, even when device 2 is missing. Once the battery warning completes, further low reports do not repeat it, and on-demand battery displays work after boot. In step 3, a disconnection interrupts the battery warning only if a full red phase fits and is actually rendered before the deadline. If the disconnect is too late for a complete red phase, the connection warning is suppressed and the battery sequence continues uninterrupted. If rendered, the connection warning takes priority; when it ends or is stopped at the deadline, the battery warning restarts from its first red phase. If the connection phase or battery warning is not visible, record the attempted interruption as inconclusive.
 
-### 6. Late connection and post-deadline exclusion
+### 6. Near-deadline cutoff and post-deadline exclusion
 
 **Configuration:** Profile B and the complete awake peripheral configurations. Use Profile F only when exact trace timestamps are needed; it enables battery warnings, so use peripherals reporting 100% or no valid low reading for an unambiguous connection-only observation.
 
-1. Start with both halves connected, then power-cycle the dongle. During boot, turn device 2 off close to 20 seconds, leaving device 1 connected. Confirm by trace that the disconnection was processed before the deadline and that fewer than two red blinks had completed by the deadline.
-2. Keep device 2 off long enough to finish the minimum. In separate runs, reconnect it during the continuation, or turn the display off with device 1 during the continuation.
-3. In a separate trace-confirmed run, start the late warning for device 1 and turn device 2 off only after boot closes. Reconnect device 1 while device 2 remains off.
+1. With both halves connected, power-cycle the dongle. In a separate run, disconnect device 2 near the end of boot and observe whether a complete red phase appears. Repeat slightly earlier and later. Stopwatch timing from power-on is approximate; module initialization and event/render scheduling prevent it from proving the exact processing boundary.
+2. Verify any shown red phase lasts its full configured interval and is not shortened to fit. There is no two-blink minimum and no post-deadline connection output. A pending battery warning, if present, follows when connection output stops at the deadline.
+3. For a coarse no-new-warning check, power-cycle with both devices connected, wait at least 30 seconds from dongle power-on, then turn device 2 off and observe for five seconds. No connection warning should start. Exact fit, insufficient-time, and delayed-render cases are covered by deterministic state/runtime tests; use verified event instrumentation only if exact module timestamps are needed.
 
-**Expected:** the pre-deadline connection warning begins immediately and, if still unresolved, completes at least two red blinks even when that extends beyond boot. Reconnecting all eligible devices or turning the display off stops it immediately. A device whose disconnection is processed after the deadline does not change or extend the continuing indication; once all devices eligible at the deadline reconnect, the warning stops even if a later device remains disconnected. Exact scheduling boundaries and a reconnect-then-disconnect race are also covered by deterministic tests.
+**Expected:** connection red phases appear only when each complete configured interval fits before the deadline. A disconnect processed at or after the deadline does not start or extend connection output but still updates ordinary connection state. The logical warning closes at the deadline; the physical strip clears when deadline handling runs and may be delayed by normal scheduling. The 30-second visual check is a coarse confirmation, not proof of the exact processed-event time.
 
 ### 7. Display-off cancellation of a battery warning
 

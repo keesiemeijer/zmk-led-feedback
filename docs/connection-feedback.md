@@ -11,16 +11,19 @@ disabled by default.
 | `CONFIG_ZMK_LED_FEEDBACK_CONNECTION`           | `n`     | Enable connection warnings during the boot window.                                         |
 | `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS` | `-1`    | Shared warning filter: `-1` means all, `0` none, or `1..N` mapped device numbers required. |
 
-The warning starts immediately for missing required devices. It stops when they reconnect. If a
-device is still missing at the 20-second deadline, the current warning ends there if it has shown
-at least two full red blinks; otherwise it finishes the two-blink minimum. During this brief
-continuation, only devices already missing at the deadline are shown. Reconnecting one removes it
-from the warning, and a disconnection processed at or after the deadline cannot add a device.
-Turning the display off stops the warning immediately.
+For a missing required device, a connection warning starts when a complete red phase fits before
+the 20-second deadline. Immediately before rendering each red phase, the module checks whether the
+configured blink interval fits in the remaining time. A phase ending exactly at the deadline
+counts as complete; one that would overrun is suppressed rather than shortened. A queued phase
+that is suppressed does not interrupt an active battery warning. Connection-warning output never
+continues after boot; at the logical deadline the module closes warning state and clears the strip
+when deadline handling runs, subject to normal scheduling latency. Turning the display off stops
+the warning immediately.
 
-Connection warnings take priority over battery warnings and ordinary layer or on-demand feedback.
-A pending battery warning runs after the connection warning ends. Turning the display off cancels
-all visible warning output; see [display-off behavior](display-off.md).
+Once rendered, connection warnings take priority over battery warnings and ordinary layer or
+on-demand feedback. A pending battery warning runs after rendered connection output ends or is
+suppressed at the deadline. Turning the display off cancels all visible warning output; see
+[display-off behavior](display-off.md).
 
 ## Connection Warning
 

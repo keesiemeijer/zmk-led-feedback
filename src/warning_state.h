@@ -48,16 +48,16 @@ struct lf_warning_state {
     uint64_t boot_deadline_ms;
     uint64_t phase_deadline_ms;
     uint32_t connected_slots;
-    uint32_t eligible_missing_slots;
     uint8_t battery_levels[LF_WARNING_MAX_PERIPHERALS];
     enum lf_warning_battery_status battery_status;
     enum lf_warning_battery_phase battery_phase;
     uint8_t battery_blinks_completed;
-    uint8_t connection_blinks_completed;
     bool boot_closed;
     bool display_enabled;
+    bool connection_pending;
     bool connection_active;
     bool connection_red;
+    bool connection_phase_pending;
     bool battery_started;
 };
 
@@ -69,5 +69,7 @@ void lf_warning_connection_event(struct lf_warning_state *state, uint64_t now_ms
 void lf_warning_battery_event(struct lf_warning_state *state, uint64_t now_ms, uint8_t slot,
                               uint8_t level);
 void lf_warning_set_display(struct lf_warning_state *state, uint64_t now_ms, bool enabled);
+bool lf_warning_render_connection_phase(struct lf_warning_state *state, uint64_t phase_start_ms);
 uint64_t lf_warning_next_deadline(const struct lf_warning_state *state);
+struct lf_warning_output lf_warning_get_connection_candidate(const struct lf_warning_state *state);
 struct lf_warning_output lf_warning_get_output(const struct lf_warning_state *state);

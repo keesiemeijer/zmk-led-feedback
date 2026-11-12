@@ -141,6 +141,13 @@ static inline int k_work_reschedule(struct k_work_delayable *work, uint64_t dela
     work->deadline = fake_now_ms + delay;
     return 0;
 }
+static inline int k_work_schedule(struct k_work_delayable *work, uint64_t delay) {
+    if (!work->pending) {
+        work->pending = true;
+        work->deadline = fake_now_ms + delay;
+    }
+    return 0;
+}
 static inline int k_work_cancel_delayable(struct k_work_delayable *work) {
     work->pending = false;
     return 0;

@@ -151,7 +151,7 @@ docker run --rm --entrypoint sh \
 1. Update the firmware CI matrix to remove deleted options and cover the four warning configurations. Include battery monitoring without warnings and connection-disabled battery warnings, so feature dependencies are checked independently.
 2. Exercise representative split configurations: zero, some, and all required slots; identity and reordered slot mappings; optional peripherals; a strip shorter than the configured slot count; and available layer and battery feedback combinations. Add or adapt fixtures only where existing ones cannot cover the case.
 3. Build retained behavior bindings and hooks with the new implementation. Exercise display-off/on, brightness, layer changes, and requested battery displays outside warnings and during both types of warnings.
-4. Extend automated tests for the specification's exact edge cases: zero and unavailable readings, low reports that later recover, post-boot state updates, repeated interruptions, the two-blink minimum, reconnects during spillover, ignored late disconnections, and no warning replay after display-off cancellation.
+4. Extend automated tests for the specification's exact edge cases: zero and unavailable readings, low reports that later recover, post-boot state updates, repeated interruptions, render-time red-phase fit at the deadline, delayed render suppression, ignored late disconnections, and no warning replay after display-off cancellation.
 
 **Gate:** deterministic runtime tests, configuration tests, and the updated firmware matrix pass. Verify the actual chosen Kconfig values and build errors in firmware builds, not merely that the build command returned success. Any unavailable matrix case or toolchain must be reported explicitly.
 
@@ -159,17 +159,24 @@ docker run --rm --entrypoint sh \
 
 - The firmware CI matrix now builds seven profiles: warnings off, connection only, battery monitoring with threshold zero, battery-only warnings with one required peripheral, both warning types, battery-only with layer feedback disabled, and a dedicated three-slot/one-LED shield. Each job checks its effective warning, threshold, required-count, and layer settings from `.config`; the short-strip job also checks the generated devicetree chain length.
 - The real ZMK validation script now checks zero, some, and all required peripherals and both identity and reordered slot mappings. It passed 43 scenarios, including the four warning combinations and all Stage 3 boundary and rejection cases.
-- The state/runtime suite passes 36 tests. New coverage verifies that a pending low-battery report stays latched through healthy and zero reports, repeated connection interruptions restart the battery sequence without a second completed warning, warning-time controls do not take over or replay, and brightness keys stop at both configured limits. Existing cases cover zero as unavailable, one LED with three peripheral slots, hook-count clamping, no-reading display, warning priority, reconnection spillover, deadline cutoffs, and display-off cancellation.
+- The state/runtime suite passed 36 tests for the original minimum-blink implementation. The approved cutoff revision and its additional regression coverage are recorded below.
 - All six warning/feature firmware profiles and the dedicated short-strip profile built locally against ZMK v0.3, with expected effective settings and UF2 outputs. The short-strip build confirms three split slots alongside a one-LED strip. The state-engine test also verifies the generic warning output for this ratio. No hardware was flashed or tested.
 
 **Stage 4 result:** automated regression and firmware matrix gate met for the covered cases. Physical behavior remains unverified; hardware checks are Stage 5.
 
+### Approved connection-cutoff revision
+
+- The authoritative [simplified specification](simplified-spec.md) now limits connection warnings to complete red phases whose interval fits before the 20-second deadline. The final fit check uses monotonic time immediately before output; a queued phase that fails the check does not preempt battery feedback. Deadline handling closes warning state logically, with physical clearing subject to normal scheduler latency.
+- The warning state/runtime suite now passes 39 cases, including exact-fit phases, insufficient remaining time, delayed render suppression, and preservation of active battery output when a connection phase is suppressed.
+- The hardware plan now reflects the cutoff rule. Test 2/3 observations made with the previous firmware behavior are historical and must be repeated with firmware built from this revision.
+- After this change, all seven firmware profiles built against ZMK v0.3 with effective settings verified. The real-ZMK validation script passed 43 scenarios, the host config suite passed 50 tests, and all 39 state/runtime tests passed both normally and under address/undefined-behavior sanitizers. The revised images still need to be flashed and the affected hardware checks repeated.
+
 ## Stage 5: Documentation and hardware validation
 
 1. Update the README and existing connection, battery, display-off, keycode, and peripheral-numbering documentation to match the implemented configuration and behavior. Remove obsolete override, startup-off, repeat, and layer-override instructions. Keep the simplified spec and this strategy consistent with any approved implementation decisions.
-2. Explain the 20-second detection window, minimum connection warning, possible battery-warning spillover, display-off cancellation, shared required-peripheral filter, and the fact that missing or zero battery readings do not trigger a warning. Document the single no-reading LED and the possibility that a genuine 0% reading is treated as unavailable.
+2. Explain the 20-second detection window, render-time connection-phase cutoff and no connection-warning spillover, possible battery-warning spillover, display-off cancellation, shared required-peripheral filter, and the fact that missing or zero battery readings do not trigger a warning. Document the single no-reading LED and the possibility that a genuine 0% reading is treated as unavailable.
 3. On representative hardware, follow the specification's timing-validation plan. Record module initialization, required peripheral connections, and first valid battery reports across multiple cold starts, sleeping and already-awake peripherals, staggered power-on, and reconnects. Record late or missing reports as well as successful timings.
-4. Observe the LED sequences and user controls on hardware, including a late connection warning, its minimum blinks, connection-to-battery priority, a battery-warning restart, and display-off cancellation. Test the ordinary layer and battery workflows after boot.
+4. Observe the LED sequences and user controls on hardware, including near-deadline red-phase admission, no connection-warning spillover, connection-to-battery priority, a battery-warning restart, and display-off cancellation. Retest any previous observation that depended on the old minimum-blink behavior. Test the ordinary layer and battery workflows after boot.
 
 Use the complete configurations and step-by-step procedures in [the hardware test plan](simplified-hardware-tests.md). Verify every profile builds with the effective settings before hardware testing.
 

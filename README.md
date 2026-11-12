@@ -32,8 +32,9 @@ This module can also be used on regular (split) keyboards, but it only reports o
 Connection and low-battery warnings are independent opt-ins and both default off. When enabled,
 they only detect eligible events during the 20 seconds after module initialization. Connection
 warnings take priority over battery warnings; a pending battery warning runs after the connection
-warning ends and may continue past the boot window. An unresolved connection warning shows at
-least two full red blinks. Warnings take priority over layer feedback, on-demand battery displays,
+warning ends and may continue past the boot window. A connection red phase starts only when its
+full configured interval fits before the boot deadline; connection warnings never spill past boot.
+Warnings take priority over layer feedback, on-demand battery displays,
 and brightness previews. Turning the display off suppresses all output and cancels an already-
 started battery-warning sequence. See the [connection](docs/connection-feedback.md) and
 [battery](docs/battery-feedback.md#low-battery-warnings) guides for details.
