@@ -34,20 +34,7 @@ Keycodes used by the `behavior-led-feedback` behavior. (See above)
 | `LF_LAYER`     | Show the current layer briefly.                                          |
 | `LF_LAYER_TOG` | Toggle continuous layer indication                                       |
 
-Brightness changes are limited by [`CONFIG_ZMK_LED_FEEDBACK_MIN_BRIGHTNESS`](../README.md#configuration-options) and
-[`CONFIG_ZMK_LED_FEEDBACK_MAX_BRIGHTNESS`](../README.md#configuration-options).
-
-#### Display and warning priority
-
-The display starts on. When it is off, all feedback is suppressed; there are no display-off
-overrides. Brightness keys turn the display on. If a boot warning is eligible, it is shown instead
-of the brightness preview.
-
-Connection and battery warnings take priority over layer feedback and on-demand battery displays.
-Layer changes still take effect, and brightness or continuous-layer settings still update, but
-feedback requests made during a warning are discarded rather than queued. Continuous layer
-indication resumes with the current layer after warnings end if it is enabled. See the
-[display behavior guide](display-off.md) for cancellation details.
+Layer feedback is suppressed when the display is turned of, or if warnings are displayed. See [display off behavior](display.md#display-off).
 
 #### Keymap
 
@@ -90,13 +77,7 @@ Use `&led_bat <device number>` to display a peripheral's battery:
 
 Device numbers follow [pairing order](peripheral-numbering.md#device-numbers-and-pairing-slots) unless changed with [`CONFIG_ZMK_LED_FEEDBACK_SLOT_ORDER`](peripheral-numbering.md#changing-the-pairing-order).
 
-#### Display and warning priority
-
-Battery requests are suppressed while the display is off or a warning is active. The shared
-required-peripheral filter applies only to automatic warnings; on-demand battery requests can
-still inspect optional peripherals when the display is on and no warning is active. A missing or
-zero battery reading displays one LED in the configured no-reading color (blue by default).
-Requests made during a warning are discarded and are not replayed afterward.
+Battery feedback is suppressed when the display is turned of, or if warnings are displayed. See [display behavior](display.md#display-off)).
 
 #### Keymap
 

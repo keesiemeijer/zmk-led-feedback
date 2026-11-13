@@ -101,7 +101,7 @@ CONFIG_ZMK_LED_FEEDBACK=y
 CONFIG_ZMK_DISPLAY=n
 ```
 
-All other module configuration options (you want to change) also go in this file.
+All other [module configuration options](../README.md#configuration-overview) (you want to change) also go in this file.
 
 You might have to copy other options over from your keyboard's shared `.conf` file to get everything working. For example, if you have [ `CONFIG_ZMK_POINTING`](https://zmk.dev/docs/features/pointing) in there you need to copy it to this file as well to have it working.
 

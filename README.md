@@ -31,11 +31,11 @@ This module can also be used on regular (split) keyboards, but it only reports o
 
 #### Warning behavior
 
-Connection and low-battery warnings are independent opt-ins and both default both to off. Warnings are only displayed during the the first 20 seconds after the dongle is connected to USB (booted). These warnings provide basic troubleshooting, but are not repeated or shown again after the boot period.
+Connection and low-battery warnings are independent opt-ins and both default to off. Warnings are only displayed during the first 20 seconds after the dongle is connected to USB (booted). These warnings provide basic troubleshooting, but are not repeated or shown again after the boot period.
 
 A connection warning will display during the full boot period until it's resolved. A Low battery warning finishes its [configured blinks](docs/battery-feedback.md#battery-warning-blinks) once started. Connection warnings take priority over battery warnings.
 
-While a warning is active, layer feedback and on-demand battery displays are suppressed. Turning the display off hides connection warnings and cancels any battery-warning.
+While a warning is active, layer feedback and on-demand battery displays are suppressed. [Turning the display off](docs/display.md#display-off) hides connection warnings and cancels any battery-warning.
 
 ## Compatibility
 
@@ -145,17 +145,18 @@ Connection feedback uses the LED strip to display a warning when a required peri
 Find out more about connection feedback in the [connection feedback documentation](docs/connection-feedback.md).
 
 - [Configuration](docs/connection-feedback.md#configuration)
-- [Connection warning](docs/connection-feedback.md#connection-warning)
+- [Connection warning](docs/connection-feedback.md#connection-warnings)
 - [Required peripherals](docs/connection-feedback.md#required-peripherals)
 
 #### Configuration options
 
 Use them in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-file) file for the dongle:
 
-| Option                                         | Default | Description                                                         |
-| ---------------------------------------------- | ------- | ------------------------------------------------------------------- |
-| `CONFIG_ZMK_LED_FEEDBACK_CONNECTION`           | `n`     | Enable boot-only connection warnings.                               |
-| `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS` | `-1`    | `-1` means all, `0` none, or `1..N` mapped device numbers required. |
+| Option                               | Default | Description                           |
+| ------------------------------------ | ------- | ------------------------------------- |
+| `CONFIG_ZMK_LED_FEEDBACK_CONNECTION` | `n`     | Enable boot-only connection warnings. |
+
+The `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS` option is shared with [battery feedback](docs/battery-feedback.md). It is used to include peripherals in connection warnings. See [the required peripherals](docs/peripheral-numbering.md#required-peripherals) documentation.
 
 ### Battery feedback
 
@@ -175,6 +176,7 @@ Find out more about battery feedback in the [battery feedback documentation](doc
 - [Enabling battery feedback](docs/battery-feedback.md#enabling-battery-feedback)
 - [Battery display colors and scale](docs/battery-feedback.md#battery-display-colors-and-scale)
 - [Low-battery warnings](docs/battery-feedback.md#low-battery-warnings)
+- [Required peripherals](docs/battery-feedback.md#required-peripherals)
 
 For percentage-to-LED mappings, see [Battery display scale](docs/battery-display-scale.md).
 
@@ -190,6 +192,8 @@ Use them in your zmk-config [`.conf`](docs/dongle-setup.md#dongle-configuration-
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_BLINKS` | `5`                             | Battery warning cycles (`1-10`), completed at most once per boot.      |
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_DELAY_MS`       | `500`                           | Off time after a battery key press before the first level appears.     |
 | `CONFIG_ZMK_LED_FEEDBACK_BATTERY_DURATION_MS`    | `1000`                          | How long each device's battery level stays lit.                        |
+
+The `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS` option is shared with [connection feedback](docs/connection-feedback.md). It is used to include peripherals in low battery warnings. See [the required peripherals](docs/peripheral-numbering.md#required-peripherals) documentation.
 
 ### Peripheral Configuration
 
