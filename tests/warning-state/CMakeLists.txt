@@ -49,6 +49,7 @@ foreach(header IN ITEMS
 		zmk/event_manager.h
 		zmk/events/battery_state_changed.h
 		zmk/events/layer_state_changed.h
+		zmk/events/position_state_changed.h
 		zmk/keymap.h)
 	get_filename_component(header_dir "${fake_include_dir}/${header}" DIRECTORY)
 	file(MAKE_DIRECTORY "${header_dir}")
@@ -63,7 +64,9 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 foreach(case IN ITEMS priority_and_restore display_controls controls_during_battery_warning
 	brightness_stops_at_bounds early_connection battery_only_feedback
-	interrupted_battery_display battery_restart delayed_deadline display_off_before_init layer_hooks)
+	interrupted_battery_display battery_restart delayed_deadline display_off_before_init layer_hooks
+	layer_inactivity_timeout layer_timeout_waits_for_battery_warning
+	layer_timeout_display_off)
 	add_test(NAME "warning_runtime_${case}" COMMAND warning_runtime_test "${case}")
 endforeach()
 foreach(case IN ITEMS connection_phase_exact_deadline delayed_connection_render

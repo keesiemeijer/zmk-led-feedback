@@ -14,6 +14,9 @@ By default, it only displays the layer briefly after a layer change.
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON`                  | `n`               | Keep showing the active layer continuously.                                                             |
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON_LAYERS`           | `""`              | Comma-separated layer numbers (for example `"2,7"`) to keep showing even when `LAYER_ALWAYS_ON` is off. |
 | `CONFIG_ZMK_LED_FEEDBACK_LAYER_DURATION_MS`                | `1000`            | How long to show the layer after a layer change.                                                        |
+| `CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES` | `0`               | Turn off continuous layer indication after inactivity. `0` disables the timeout; valid values are `0-60` minutes. |
+
+When enabled, the inactivity timer starts after the 20-second boot warning window and any active battery warning have finished, with the display on. Any key press, including modifier-only presses, resets the timer; key releases do not. If the timeout expires, only continuous layer indication is suppressed. A key press restores it for the current layer. Key presses while the display is off count as activity but do not turn it on; turning the display back on starts a fresh timeout after warnings have finished.
 
 ## Keycodes
 

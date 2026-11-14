@@ -19,6 +19,7 @@
 #include <zmk/event_manager.h>
 #include <zmk/events/battery_state_changed.h>
 #include <zmk/events/layer_state_changed.h>
+#include <zmk/events/position_state_changed.h>
 #include <zmk/keymap.h>
 
 #include "warning_state.h"
@@ -155,6 +156,14 @@ static bool brightness_preview;
 static bool layer_feedback_requested;
 static bool layer_change_requested;
 static bool layer_always_on = IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON);
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+static bool layer_timeout_expired;
+static bool layer_timeout_started;
+static bool layer_continuous_visible;
+#if !LF_TRACK_WARNINGS
+static uint64_t layer_timeout_boot_deadline_ms;
+#endif
+#endif
 
 // True when layer is an entry of a comma separated list of layer numbers.
 // Invalid entries are ignored.
@@ -177,18 +186,38 @@ static bool layer_in_list(const char *list, int layer) {
     return false;
 }
 
-// The layer indication stays on for all layers, or for the layers in ALWAYS_ON_LAYERS.
+// Continuous layer indication is enabled globally or for individual layers.
+static bool layer_continuous_enabled(void) {
+    return layer_always_on ||
+           layer_in_list(CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON_LAYERS,
+                         zmk_keymap_highest_layer_active());
+}
+
 static bool layer_stays_on(void) {
-    return layer_always_on || layer_in_list(CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON_LAYERS, zmk_keymap_highest_layer_active());
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+    return !layer_timeout_expired && layer_continuous_enabled();
+#else
+    return layer_continuous_enabled();
+#endif
 }
 
 // Layer show and clear work handlers. These are used to update the LED strip for layer changes.
 static void layer_show_handler(struct k_work *work);
 static void layer_clear_handler(struct k_work *work);
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+static void layer_timeout_handler(struct k_work *work);
+static void layer_timeout_gate_handler(struct k_work *work);
+static void layer_timeout_maybe_start(void);
+static void layer_timeout_note_activity(void);
+#endif
 
 // Delayable work items for layer show and clear. These allow the LED updates to be scheduled with a delay.
 static K_WORK_DELAYABLE_DEFINE(layer_show_work, layer_show_handler);
 static K_WORK_DELAYABLE_DEFINE(layer_clear_work, layer_clear_handler);
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+static K_WORK_DELAYABLE_DEFINE(layer_timeout_work, layer_timeout_handler);
+static K_WORK_DELAYABLE_DEFINE(layer_timeout_gate_work, layer_timeout_gate_handler);
+#endif
 
 // Parses the "RRGGBB" entry of a comma separated list.
 static uint32_t palette_rgb(const char *list, int idx) {
@@ -297,6 +326,9 @@ static void layer_show_handler(struct k_work *work) {
     layer_change_requested = false;
     bool preview = brightness_preview;
     brightness_preview = false;
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+    layer_continuous_visible = false;
+#endif
 
     // Check if feedback can be shown for the current source. If not, deactivate the layer and return.
     if (!feedback_can_show(source)) {
@@ -315,6 +347,9 @@ static void layer_show_handler(struct k_work *work) {
 // Layer clear handler. This clears the LED strip when a layer is no longer active.
 static void layer_clear_handler(struct k_work *work) {
     layer_active = false;
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+    layer_continuous_visible = false;
+#endif
 
     if (!feedback_can_show(FEEDBACK_NONE)) {
         return;
@@ -322,10 +357,90 @@ static void layer_clear_handler(struct k_work *work) {
 
     if (layer_stays_on()) {
         draw_layer(false, FEEDBACK_NONE);
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+        layer_continuous_visible = true;
+#endif
     } else {
         update_strip(0, (struct led_rgb){0}, FEEDBACK_NONE);
     }
 }
+
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+static bool layer_timeout_conditions_met(void) {
+    if (!atomic_get(&leds_enabled)) {
+        return false;
+    }
+
+#if LF_TRACK_WARNINGS
+    k_spinlock_key_t key = k_spin_lock(&warning_lock);
+    bool ready = warning_ready && warning_state.boot_closed &&
+                 lf_warning_get_output(&warning_state).type == LF_WARNING_OUTPUT_NONE;
+    k_spin_unlock(&warning_lock, key);
+    return ready;
+#else
+    return k_uptime_get() >= layer_timeout_boot_deadline_ms;
+#endif
+}
+
+static void layer_timeout_maybe_start(void) {
+    if (layer_timeout_started || layer_timeout_expired || !layer_timeout_conditions_met()) {
+        return;
+    }
+
+    layer_timeout_started = true;
+    k_work_reschedule(&layer_timeout_work,
+                      K_MSEC(CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES *
+                             60 * 1000));
+}
+
+static void layer_timeout_handler(struct k_work *work) {
+    layer_timeout_started = false;
+    if (!layer_timeout_conditions_met()) {
+        layer_timeout_maybe_start();
+        return;
+    }
+
+    layer_timeout_expired = true;
+    if (layer_continuous_visible) {
+        layer_clear_handler(NULL);
+    }
+}
+
+static void layer_timeout_gate_handler(struct k_work *work) {
+#if !LF_TRACK_WARNINGS
+    uint64_t now_ms = k_uptime_get();
+    if (now_ms < layer_timeout_boot_deadline_ms) {
+        k_work_reschedule(&layer_timeout_gate_work,
+                          K_MSEC(layer_timeout_boot_deadline_ms - now_ms));
+        return;
+    }
+#endif
+    layer_timeout_maybe_start();
+}
+
+static void layer_timeout_note_activity(void) {
+    bool restore_continuous = layer_timeout_expired && layer_continuous_enabled();
+    layer_timeout_expired = false;
+
+    if (layer_timeout_started) {
+        k_work_reschedule(&layer_timeout_work,
+                          K_MSEC(CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES *
+                                 60 * 1000));
+    } else {
+        layer_timeout_maybe_start();
+    }
+
+    bool other_feedback_active = layer_active;
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
+    other_feedback_active = other_feedback_active || battery_active;
+#endif
+    if (restore_continuous && !other_feedback_active && device_is_ready(strip) &&
+        feedback_can_show(FEEDBACK_LAYER)) {
+        layer_feedback_requested = true;
+        k_work_reschedule(&layer_show_work, K_NO_WAIT);
+    }
+}
+#endif
 
 // ZMK layer events listener. Schedules the layer_show_handler when the layer state changes.
 static int layer_listener(const zmk_event_t *eh) {
@@ -336,8 +451,25 @@ static int layer_listener(const zmk_event_t *eh) {
     return ZMK_EV_EVENT_BUBBLE;
 }
 
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+static int position_listener(const zmk_event_t *eh) {
+    const struct zmk_position_state_changed *event = as_zmk_position_state_changed(eh);
+    if (event && event->state) {
+        layer_timeout_note_activity();
+    }
+    return ZMK_EV_EVENT_BUBBLE;
+}
+#endif
+
 // Initializes the layer feedback. Schedules the layer_show_handler if the layer should stay on.
 static int layer_init(void) {
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+#if !LF_TRACK_WARNINGS
+    layer_timeout_boot_deadline_ms = k_uptime_get() + LF_WARNING_BOOT_MS;
+#endif
+    k_work_schedule(&layer_timeout_gate_work, K_MSEC(LF_WARNING_BOOT_MS));
+    layer_timeout_maybe_start();
+#endif
     if (layer_stays_on()) {
         k_work_reschedule(&layer_show_work, K_NO_WAIT);
     }
@@ -350,6 +482,10 @@ SYS_INIT(layer_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
 ZMK_LISTENER(led_feedback_layer, layer_listener);
 // ZMK subscription for the layer listener.
 ZMK_SUBSCRIPTION(led_feedback_layer, zmk_layer_state_changed);
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+ZMK_LISTENER(led_feedback_position, position_listener);
+ZMK_SUBSCRIPTION(led_feedback_position, zmk_position_state_changed);
+#endif
 
 #endif // IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
 
@@ -683,7 +819,18 @@ void zmk_led_feedback_set_enabled(int mode) {
 
     if (enabled) {
         show_preview();
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER) && \
+    CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+        layer_timeout_maybe_start();
+#endif
     } else {
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER) && \
+    CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+        k_work_cancel_delayable(&layer_timeout_work);
+        layer_timeout_started = false;
+        layer_timeout_expired = false;
+        layer_continuous_visible = false;
+#endif
         update_strip(0, (struct led_rgb){0}, FEEDBACK_NONE);
     }
 }
@@ -697,6 +844,9 @@ static void battery_take_over(void) {
     k_work_cancel_delayable(&layer_show_work);
     k_work_cancel_delayable(&layer_clear_work);
     layer_active = false;
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+    layer_continuous_visible = false;
+#endif
 #endif
 
     battery_active = true;
@@ -779,6 +929,9 @@ static void warning_work_handler(struct k_work *work) {
             layer_feedback_requested = false;
             layer_change_requested = false;
             brightness_preview = false;
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+            layer_continuous_visible = false;
+#endif
 #endif
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
             battery_cancel();
@@ -811,12 +964,19 @@ static void warning_work_handler(struct k_work *work) {
             k_mutex_unlock(&strip_lock);
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER)
             layer_clear_handler(NULL);
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+            layer_timeout_maybe_start();
+#endif
 #else
             update_strip(0, (struct led_rgb){0}, FEEDBACK_NONE);
 #endif
             return;
         }
         k_mutex_unlock(&strip_lock);
+#if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_LAYER) && \
+    CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+        layer_timeout_maybe_start();
+#endif
         return;
     }
 
