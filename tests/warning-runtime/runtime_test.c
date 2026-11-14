@@ -21,8 +21,10 @@ int fake_layer;
 static int run_until(uint64_t limit_ms) {
     struct k_work_delayable *works[] = {
         &warning_work,
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
         &layer_timeout_work,
         &layer_timeout_gate_work,
+#endif
         &layer_show_work,
         &layer_clear_work,
         &battery_work,
@@ -73,10 +75,12 @@ static void report_battery(uint8_t slot, uint8_t level) {
     battery_listener(&event);
 }
 
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
 static void report_key_state(bool pressed) {
     struct zmk_position_state_changed event = {.state = pressed};
     position_listener((const zmk_event_t *)&event);
 }
+#endif
 
 static int initialize_continuous_layer(void) {
     layer_always_on = true;
@@ -379,6 +383,7 @@ static int test_layer_hooks(void) {
     return 0;
 }
 
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
 static int test_layer_inactivity_timeout(void) {
     CHECK(initialize_continuous_layer() == 0);
     CHECK(run_until(1000) == 0);
@@ -424,6 +429,12 @@ static int test_layer_timeout_waits_for_battery_warning(void) {
     CHECK(run_until(20000) == 0);
     CHECK(!layer_timeout_started);
     CHECK(warning_state.battery_status == LF_WARNING_BATTERY_ACTIVE);
+    struct led_rgb warning_pixels[4];
+    memcpy(warning_pixels, fake_pixels, sizeof(warning_pixels));
+    report_key_state(true);
+    CHECK(warning_state.battery_status == LF_WARNING_BATTERY_ACTIVE);
+    CHECK(memcmp(warning_pixels, fake_pixels, sizeof(warning_pixels)) == 0);
+    CHECK(!layer_timeout_started);
 
     CHECK(run_until(28999) == 0);
     CHECK(warning_state.battery_status == LF_WARNING_BATTERY_DONE);
@@ -463,6 +474,15 @@ static int test_layer_timeout_display_off(void) {
     CHECK(layer_timeout_work.deadline == 110000);
     return 0;
 }
+#else
+static int test_layer_timeout_disabled(void) {
+    CHECK(initialize_continuous_layer() == 0);
+    CHECK(run_until(20 * 60 * 1000) == 0);
+    CHECK(layer_continuous_enabled());
+    CHECK(pixels_match(0, 64, 0, 1));
+    return 0;
+}
+#endif
 
 static int test_mapped_required_filter(void) {
     CHECK(led_feedback_init() == 0);
@@ -506,9 +526,13 @@ int main(int argc, char **argv) {
         {"suppressed_connection_preserves_battery", test_suppressed_connection_preserves_battery},
         {"display_off_before_init", test_display_off_before_init},
         {"layer_hooks", test_layer_hooks},
+#if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
         {"layer_inactivity_timeout", test_layer_inactivity_timeout},
         {"layer_timeout_waits_for_battery_warning", test_layer_timeout_waits_for_battery_warning},
         {"layer_timeout_display_off", test_layer_timeout_display_off},
+#else
+        {"layer_timeout_disabled", test_layer_timeout_disabled},
+#endif
         {"mapped_required_filter", test_mapped_required_filter},
     };
     if (argc != 2) {

@@ -96,3 +96,14 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 add_test(NAME warning_runtime_mapped_required_filter
 	COMMAND warning_runtime_mapped_test mapped_required_filter)
+
+add_executable(warning_runtime_timeout_disabled_test ../warning-runtime/runtime_test.c ../warning-runtime/test_hooks.c ../../src/warning_state.c)
+target_include_directories(warning_runtime_timeout_disabled_test PRIVATE ../warning-runtime "${fake_include_dir}" ../../include ../../src)
+target_compile_definitions(warning_runtime_timeout_disabled_test PRIVATE
+	CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES=0)
+set_target_properties(warning_runtime_timeout_disabled_test PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+	target_compile_options(warning_runtime_timeout_disabled_test PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-unused-function)
+endif()
+add_test(NAME warning_runtime_layer_timeout_disabled
+	COMMAND warning_runtime_timeout_disabled_test layer_timeout_disabled)
