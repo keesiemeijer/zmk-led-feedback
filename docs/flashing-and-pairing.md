@@ -39,7 +39,7 @@ that assignment when the dongle, or any of the peripherals, disconnects and reco
 Connection feedback uses these slot numbers (also known as [device numbers](peripheral-numbering.md#device-numbers-and-pairing-slots)) to identify a missing peripheral, and
 battery feedback uses them to select which peripheral's battery to display.
 
-You can see the pairing slot by powering off a keyboard half. With enough LEDs, [connection feedback](connection-feedback.md#connection-warning) will show a warning by blinking red leds. The number of blinking LEDs match the missing peripheral's device number (pairing slot).
+You can see the pairing slot by powering off a keyboard half. With enough LEDs, [connection feedback](connection-feedback.md#connection-warnings) will show a warning by blinking red leds. The number of blinking LEDs match the missing peripheral's device number (pairing slot).
 
 ## Connecting the dongle to your computer
 

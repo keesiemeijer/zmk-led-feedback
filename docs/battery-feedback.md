@@ -69,7 +69,7 @@ for strips with 1 to 10 LEDs.
 
 ## Low-battery warnings
 
-Low battery warnings are only displayed during the first 20 seconds after booting the dongle. See [battery behavior](../README.md#warning-behavior)
+Low battery warnings are only displayed during the first 20 seconds after booting the dongle. See [warning behavior](../README.md#warning-behavior)
 
 Set a battery warning threshold in the zmk-config [`.conf`](dongle-setup.md#dongle-configuration-file) file for the dongle. Use `0` for no warnings or a value between `2` and `100` for the warning threshold.
 
@@ -81,7 +81,7 @@ CONFIG_ZMK_LED_FEEDBACK_BATTERY_WARNING_LEVEL=15
 
 The warning blinks red then yellow. At most four LEDs blink, regardless of strip length. The warnings don’t display the device number (as connection warnings do). Press the [battery feedback keys](#keycodes) for each device to find which one needs charging.
 
-If a [connection warning](connection-feedback.md#connection-warning) interrupts a battery warning (because it has priority), the full battery warning restarts when the connection warning ends
+If a [connection warning](connection-feedback.md#connection-warnings) interrupts a battery warning (because it has priority), the full battery warning restarts when the connection warning ends
 
 While a warning is active, layer feedback and on-demand battery displays are suppressed. Turning the display off cancels any battery-warning. See [display-off behavior](display.md#display-off).
 
