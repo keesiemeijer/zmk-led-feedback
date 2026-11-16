@@ -29,7 +29,7 @@ This module can also be used on regular (split) keyboards, but it only reports o
 - [Connection](docs/flashing-and-pairing.md#connecting-the-dongle-to-your-computer)
     - Connect the dongle with a USB cable or use Bluetooth (when the dongle is powered by a charger).
 
-#### Warning behavior
+### Warning behavior
 
 Connection and low-battery warnings are independent opt-ins and both default to off. Warnings are only displayed during the first 20 seconds after the dongle is connected to USB (booted). These warnings provide basic troubleshooting, but are not repeated or shown again after the boot period.
 
@@ -121,6 +121,7 @@ Find out more about layer feedback in the [Layer feedback documentation](docs/la
 
 - [Configuration](docs/layer-feedback.md#configuration)
 - [Keycodes](docs/layer-feedback.md#keycodes)
+- [Continuous layer indication](docs/layer-feedback.md#continuous-layer-indication)
 - [Layer colors](docs/layer-feedback.md#layer-colors)
 - [Change LED count and color with Hooks](docs/layer-feedback.md#change-led-count-and-color-with-hooks)
 

@@ -5,15 +5,16 @@ By default, it only displays the layer briefly after a layer change.
 
 ## Configuration
 
-| Option                                                     | Default           | Description                                                                                             |
-| ---------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------- |
-| `CONFIG_ZMK_LED_FEEDBACK_LAYER`                            | `y`               | Enable layer feedback.                                                                                  |
-| `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS`                     | `"00FF00,FFFF00"` | Comma-separated `RRGGBB` colors for layer groups. Each color is used until the strip fills. Default     |
-| `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER`           | `""`              | Optional per-layer color palette. When set, overrides `LAYER_COLORS`                                    |
-| `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER_LED_COUNT` | `0`               | `0` Default. same as `COLORS_PER_LAYER`, `-1` lights all LEDs, `N` lights N LEDs.                       |
-| `CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON`                  | `n`               | Keep showing the active layer continuously.                                                             |
-| `CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON_LAYERS`           | `""`              | Comma-separated layer numbers (for example `"2,7"`) to keep showing even when `LAYER_ALWAYS_ON` is off. |
-| `CONFIG_ZMK_LED_FEEDBACK_LAYER_DURATION_MS`                | `1000`            | How long to show the layer after a layer change.                                                        |
+| Option                                                     | Default           | Description                                                                                                       |
+| ---------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `CONFIG_ZMK_LED_FEEDBACK_LAYER`                            | `y`               | Enable layer feedback.                                                                                            |
+| `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS`                     | `"00FF00,FFFF00"` | Comma-separated `RRGGBB` colors for layer groups. Each color is used until the strip fills. Default               |
+| `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER`           | `""`              | Optional per-layer color palette. When set, overrides `LAYER_COLORS`                                              |
+| `CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER_LED_COUNT` | `0`               | `0` Default. same as `COLORS_PER_LAYER`, `-1` lights all LEDs, `N` lights N LEDs.                                 |
+| `CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON`                  | `n`               | Keep showing the active layer continuously.                                                                       |
+| `CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON_LAYERS`           | `""`              | Comma-separated layer numbers (for example `"2,7"`) to keep showing even when `LAYER_ALWAYS_ON` is off.           |
+| `CONFIG_ZMK_LED_FEEDBACK_LAYER_DURATION_MS`                | `1000`            | How long to show the layer after a layer change. Valid values are `1-3600000` ms (up to one hour).                |
+| `CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES` | `0`               | Turn off continuous layer indication after inactivity. `0` disables the timeout; valid values are `0-60` minutes. |
 
 ## Keycodes
 
@@ -25,6 +26,36 @@ There are two keycodes to briefly display the current layer and to toggle the co
 | `LF_LAYER_TOG` | Toggle continuous layer indication |
 
 Find more information about keycodes in the [keycodes documentation](keycodes.md)
+
+## Continuous layer indication
+
+Continuous indication keeps the active layer visible instead of showing it only briefly after a layer change. You can enable it in in your zmk-config [`.conf`](dongle-setup.md#dongle-configuration-file) file for the dongle.
+
+```ini
+CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON=y
+```
+
+To enable it only for selected layers, leave it off and list the layer numbers with this option:
+
+```ini
+CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON_LAYERS="2,7"
+```
+
+You can also toggle continuous layer indication on and off with the `LF_LAYER_TOG` keycode. See [keycodes](#keycodes).
+
+### Inactivity timer
+
+The inactivity timer `CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES` starts after the [20-second boot warning window](../README.md#warning-behavior). Only continuous layer indication is turned off if the timeout expires. Any key press, including modifier-only presses, resets the timer.
+
+Set it in your zmk-config [`.conf`](dongle-setup.md#dongle-configuration-file) file for the dongle.
+
+```ini
+# Set continuous layer indication on.
+CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON=y
+
+# Turn continuous layer indication off after 2 minutes of inactivity.
+CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES=2
+```
 
 ## Layer colors
 

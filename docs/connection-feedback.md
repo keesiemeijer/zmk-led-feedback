@@ -9,7 +9,7 @@ Connection warnings are only displayed during the first 20 seconds after booting
 | `CONFIG_ZMK_LED_FEEDBACK_CONNECTION`           | `n`     | Enable connection warnings during the boot window.                                         |
 | `CONFIG_ZMK_LED_FEEDBACK_REQUIRED_PERIPHERALS` | `-1`    | Shared warning filter: `-1` means all, `0` none, or `1..N` mapped device numbers required. |
 
-A connection warning takes priority over a low battery warning. Layer and battery feedback display is suppressed during warnings. Turning the display off hides the connection warning output. See [display-off behavior](display.md).
+A connection warning takes priority over a low battery warning. Layer and battery feedback display is suppressed during warnings. Turning the display off hides the connection warning output. See [display-off behavior](display.md#display-off).
 
 ## Connection Warnings
 

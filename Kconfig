@@ -56,6 +56,16 @@ config ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON_LAYERS
       The layer indication of these layers stays on, also when ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON
       is off. Other layers turn off after the layer duration. Example: "2,7".
 
+config ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES
+    int "Minutes of inactivity before continuous layer indication turns off (0 = never)"
+    range 0 60
+    default 0
+    depends on ZMK_LED_FEEDBACK_LAYER
+    help
+      Turns off continuous layer indication after the specified number of minutes without key
+      presses. The timer starts after the boot warning window and any active battery warning end.
+      A key press turns the indication back on. Set to 0 to disable the timeout.
+
 config ZMK_LED_FEEDBACK_CONNECTION
     bool "Show connection warnings during boot"
     default n

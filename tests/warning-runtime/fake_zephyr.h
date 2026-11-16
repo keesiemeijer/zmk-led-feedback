@@ -13,6 +13,9 @@
 #define CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON 0
 #define CONFIG_ZMK_LED_FEEDBACK_LAYER_ALWAYS_ON_LAYERS ""
 #define CONFIG_ZMK_LED_FEEDBACK_LAYER_DURATION_MS 1000
+#ifndef CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES
+#define CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES 1
+#endif
 #define CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS "00FF00,FFFF00"
 #define CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER ""
 #define CONFIG_ZMK_LED_FEEDBACK_LAYER_COLORS_PER_LAYER_LED_COUNT 0
@@ -112,6 +115,13 @@ struct zmk_peripheral_battery_state_changed {
 
 typedef struct zmk_peripheral_battery_state_changed zmk_event_t;
 
+struct zmk_position_state_changed {
+    uint8_t source;
+    uint32_t position;
+    bool state;
+    int64_t timestamp;
+};
+
 extern uint64_t fake_now_ms;
 extern struct device fake_device;
 extern struct led_rgb fake_pixels[4];
@@ -135,6 +145,10 @@ static inline int zmk_ble_put_peripheral_addr(const uint8_t *address) { return *
 static inline const struct zmk_peripheral_battery_state_changed *
 as_zmk_peripheral_battery_state_changed(const zmk_event_t *event) {
     return event;
+}
+static inline const struct zmk_position_state_changed *
+as_zmk_position_state_changed(const zmk_event_t *event) {
+    return (const struct zmk_position_state_changed *)event;
 }
 static inline int k_work_reschedule(struct k_work_delayable *work, uint64_t delay) {
     work->pending = true;
