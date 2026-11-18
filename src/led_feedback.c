@@ -193,6 +193,7 @@ static bool layer_continuous_enabled(void) {
                          zmk_keymap_highest_layer_active());
 }
 
+// Returns true if the layer should stay on.
 static bool layer_stays_on(void) {
 #if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
     return !layer_timeout_expired && layer_continuous_enabled();
@@ -365,12 +366,14 @@ static void layer_clear_handler(struct k_work *work) {
     }
 }
 
+// Layer timeout logic for inactivity.
 #if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
 static bool layer_timeout_conditions_met(void) {
     if (!atomic_get(&leds_enabled)) {
         return false;
     }
 
+    // Check if layer timeout can start
 #if LF_TRACK_WARNINGS
     k_spinlock_key_t key = k_spin_lock(&warning_lock);
     bool ready = warning_ready && warning_state.boot_closed &&
@@ -382,6 +385,7 @@ static bool layer_timeout_conditions_met(void) {
 #endif
 }
 
+// Start layer timeout if conditions met
 static void layer_timeout_maybe_start(void) {
     if (layer_timeout_started || layer_timeout_expired || !layer_timeout_conditions_met()) {
         return;
@@ -393,6 +397,7 @@ static void layer_timeout_maybe_start(void) {
                              60 * 1000));
 }
 
+// Handle layer timeout expiration
 static void layer_timeout_handler(struct k_work *work) {
     layer_timeout_started = false;
     if (!layer_timeout_conditions_met()) {
@@ -406,6 +411,7 @@ static void layer_timeout_handler(struct k_work *work) {
     }
 }
 
+// Gate for starting layer timeout after boot
 static void layer_timeout_gate_handler(struct k_work *work) {
 #if !LF_TRACK_WARNINGS
     uint64_t now_ms = k_uptime_get();
@@ -418,6 +424,7 @@ static void layer_timeout_gate_handler(struct k_work *work) {
     layer_timeout_maybe_start();
 }
 
+// Note activity to reset timeout
 static void layer_timeout_note_activity(void) {
     bool restore_continuous = layer_timeout_expired && layer_continuous_enabled();
     layer_timeout_expired = false;
@@ -451,6 +458,7 @@ static int layer_listener(const zmk_event_t *eh) {
     return ZMK_EV_EVENT_BUBBLE;
 }
 
+// Position events for layer timeout
 #if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
 static int position_listener(const zmk_event_t *eh) {
     const struct zmk_position_state_changed *event = as_zmk_position_state_changed(eh);
@@ -483,7 +491,9 @@ ZMK_LISTENER(led_feedback_layer, layer_listener);
 // ZMK subscription for the layer listener.
 ZMK_SUBSCRIPTION(led_feedback_layer, zmk_layer_state_changed);
 #if CONFIG_ZMK_LED_FEEDBACK_LAYER_INACTIVITY_TIMEOUT_MINUTES > 0
+//  Register position listener for layer timeout
 ZMK_LISTENER(led_feedback_position, position_listener);
+// Subscribe to position events for timeout
 ZMK_SUBSCRIPTION(led_feedback_position, zmk_position_state_changed);
 #endif
 
@@ -517,10 +527,12 @@ BUILD_ASSERT(PERIPHERALS <= LF_WARNING_MAX_PERIPHERALS,
 BUILD_ASSERT(STRIP_LEN > 0 && STRIP_LEN <= UINT16_MAX,
              "LED feedback strip length is invalid");
 
+// Schedule warning work
 static void warning_schedule_locked(void) {
     k_work_reschedule(&warning_work, K_NO_WAIT);
 }
 
+// Handle connection events for warnings
 static void warning_connection_event(uint8_t slot, bool connected) {
     if (slot >= PERIPHERALS || slot >= LF_WARNING_MAX_PERIPHERALS) {
         return;
@@ -595,11 +607,13 @@ static void led_feedback_disconnected(struct bt_conn *conn, uint8_t reason) {
     set_connected(conn, false);
 }
 
+// Bluetooth connection callbacks
 BT_CONN_CB_DEFINE(led_feedback_conn_cb) = {
     .connected = led_feedback_connected,
     .disconnected = led_feedback_disconnected,
 };
 
+// Initialize LED feedback system
 static int led_feedback_init(void) {
     struct lf_warning_config config = {
         .peripheral_count = PERIPHERALS,
@@ -678,11 +692,13 @@ static int battery_slot(int number) {
     return -1;
 }
 
+// Cancel battery display if active.
 static void battery_cancel(void) {
     battery_active = false;
     k_work_cancel_delayable(&battery_work);
 }
 
+// Finish battery display.
 static void battery_finish(void) {
     battery_active = false;
 
@@ -835,6 +851,7 @@ void zmk_led_feedback_set_enabled(int mode) {
     }
 }
 
+// Battery display logic
 #if IS_ENABLED(CONFIG_ZMK_LED_FEEDBACK_BATTERY)
 // Stops the layer display and any battery display, so the strip is free for a battery display.
 static void battery_take_over(void) {
@@ -880,6 +897,7 @@ void zmk_led_feedback_show_battery(int number) {
 // Handles warning work, updating the LED strip based on the current warning state.
 #if LF_TRACK_WARNINGS
 static void warning_work_handler(struct k_work *work) {
+    // Skip if strip not ready
     if (!device_is_ready(strip)) {
         k_spinlock_key_t key = k_spin_lock(&warning_lock);
         if (warning_ready) {
@@ -889,6 +907,7 @@ static void warning_work_handler(struct k_work *work) {
         return;
     }
 
+    // Skip if warning not ready
     k_mutex_lock(&strip_lock, K_FOREVER);
     k_spinlock_key_t key = k_spin_lock(&warning_lock);
     if (!warning_ready) {
@@ -905,6 +924,7 @@ static void warning_work_handler(struct k_work *work) {
     uint64_t deadline = lf_warning_next_deadline(&warning_state);
     k_spin_unlock(&warning_lock, key);
 
+    // Handle connection phase if needed
     if (candidate.type == LF_WARNING_OUTPUT_CONNECTION) {
         fill_pixels_locked(candidate.led_count, scale_rgb(candidate.color), true);
         key = k_spin_lock(&warning_lock);
@@ -916,6 +936,7 @@ static void warning_work_handler(struct k_work *work) {
         }
         k_spin_unlock(&warning_lock, key);
 
+        // If rendered, update LEDs
         if (rendered) {
             if (!atomic_get(&leds_enabled)) {
                 fill_pixels_locked(0, (struct led_rgb){0}, false);
